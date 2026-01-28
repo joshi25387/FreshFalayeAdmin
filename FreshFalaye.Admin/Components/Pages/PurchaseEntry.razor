@@ -1,0 +1,315 @@
+﻿@page "/stock/purchases"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject PurchaseApiService PurchaseApi
+@inject ProductApiService ProductApi
+@inject ProductGroupApiService ProductGroupApi
+@inject PartyApiService PartyApi
+@inject ExpenseMasterApiService ExpenseApi
+@inject NotificationService NotificationService
+
+<RadzenCard Style="padding:8px">
+
+    <!-- ================= HEADER ================= -->
+
+    <div class="row g-1 mb-2 align-items-end">
+
+        <div class="col-2">
+            <RadzenLabel Text="Date" />
+            <RadzenDatePicker @bind-Value="header.PurchaseDate" Style="width:100%" />
+        </div>
+
+        <div class="col-3">
+            <RadzenLabel Text="Party" />
+            <RadzenDropDown Data="@parties"
+                            TextProperty="PartyName"
+                            ValueProperty="PartyId"
+                            @bind-Value="header.PartyId"
+                            Style="width:100%" />
+        </div>
+
+        <div class="col-2">
+            <RadzenLabel Text="Party Inv No" />
+            <RadzenTextBox @bind-Value="header.PartyInvoiceNo" Style="width:100%" />
+        </div>
+
+        <div class="col-2">
+            <RadzenLabel Text="Invoice No" />
+            <RadzenTextBox @bind-Value="header.InvoiceNo" Style="width:100%" />
+        </div>
+
+        <div class="col-2">
+            <RadzenLabel Text="Vehicle No" />
+            <RadzenTextBox @bind-Value="header.VehicleNo" Style="width:100%" />
+        </div>
+
+        <div class="col-1">
+            <RadzenButton Text="Save"
+                          Size="ButtonSize.Small"
+                          Click="@SavePurchase" />
+        </div>
+
+    </div>
+
+    <!-- ================= ITEM GRID ================= -->
+
+    <div class="d-flex mb-1">
+        <RadzenButton Text="Add Row (F2)"
+                      Icon="add"
+                      Size="ButtonSize.Small"
+                      Click="@AddNewRow" />
+    </div>
+
+    <RadzenDataGrid @ref="grid"
+                    TItem="PurchaseItemRow"
+                    Data="@items"
+                    EditMode="DataGridEditMode.Single"
+                    AllowPaging="false"
+                    Style="height:50vh"
+                    RowClick="@OnRowClick"
+                    RowUpdate="@OnRowUpdate">
+
+        <Columns>
+
+            <RadzenDataGridColumn Title="Group" Width="150px">
+                <Template Context="row">
+                    @productGroups.FirstOrDefault(g => g.ProductGroupId == row.ProductGroupId)?.GroupName
+                </Template>
+                <EditTemplate Context="row">
+                    <RadzenDropDown Data="@productGroups"
+                                    TextProperty="GroupName"
+                                    ValueProperty="ProductGroupId"
+                                    @bind-Value="row.ProductGroupId"
+                                    Change="@(args => OnGroupChanged(row))"
+                                    Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Product" Width="220px">
+                <Template Context="row">
+                    @products.FirstOrDefault(p => p.ProductId == row.ProductId)?.ProductName
+                </Template>
+                <EditTemplate Context="row">
+                    <RadzenDropDown Data="@row.FilteredProducts"
+                                    TextProperty="ProductName"
+                                    ValueProperty="ProductId"
+                                    @bind-Value="row.ProductId"
+                                    Change="@(args => OnProductChanged(row))"
+                                    Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Property="UnitName" Title="Unit" Width="80px" />
+
+            <RadzenDataGridColumn Title="Qty" Width="80px">
+                <Template Context="row">@row.Qty</Template>
+                <EditTemplate Context="row">
+                    <RadzenNumeric @bind-Value="row.Qty" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Rate" Width="90px">
+                <Template Context="row">@row.Rate</Template>
+                <EditTemplate Context="row">
+                    <RadzenNumeric @bind-Value="row.Rate" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="GST%" Width="70px">
+                <Template Context="row">@row.GstPercent</Template>
+                <EditTemplate Context="row">
+                    <RadzenNumeric @bind-Value="row.GstPercent" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Property="Amount" Title="Amount" Width="100px" />
+            <RadzenDataGridColumn Width="40px">
+                <Template Context="row">
+                    <RadzenButton Icon="delete"
+                                  Size="ButtonSize.Small"
+                                  ButtonStyle="ButtonStyle.Danger"
+                                  Click="@(() => DeleteRow(row))" />
+                </Template>
+            </RadzenDataGridColumn>
+
+        </Columns>
+    </RadzenDataGrid>
+
+    <!-- ================= EXPENSE GRID ================= -->
+
+    <RadzenDataGrid TItem="PurchaseExpenseRow"
+                    Data="@expenses"
+                    AllowPaging="false"
+                    Style="height:18vh"
+                    Class="mt-2">
+
+        <Columns>
+            <RadzenDataGridColumn Property="ExpenseName" Title="Expense" />
+            <RadzenDataGridColumn Property="RateType" Title="Type" Width="60px" />
+            <RadzenDataGridColumn Property="Rate" Title="Rate" Width="80px" />
+            <RadzenDataGridColumn Property="Amount" Title="Amount" Width="100px" />
+        </Columns>
+
+    </RadzenDataGrid>
+
+    <!-- ================= TOTAL BAR ================= -->
+
+    <div class="d-flex mt-2 border-top pt-2 fw-bold">
+        <div>Item Total: @ItemTotal</div>
+        <div class="ms-3">Expense Total: @ExpenseTotal</div>
+        <div class="ms-auto">Net Amount: @NetAmount</div>
+    </div>
+
+</RadzenCard>
+
+@code {
+
+    RadzenDataGrid<PurchaseItemRow>? grid;
+    PurchaseItemRow? editingRow;
+
+    PurchaseHeaderDto header = new() { PurchaseDate = DateTime.Today };
+
+    List<PartyDto> parties = new();
+    List<ProductGroupDto> productGroups = new();
+    List<ProductDto> products = new();
+
+    List<PurchaseItemRow> items = new();
+    List<PurchaseExpenseRow> expenses = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        parties = await PartyApi.GetPartiesAsync();
+        productGroups = await ProductGroupApi.GetGroupsAsync();
+        products = await ProductApi.GetProductsAsync();
+        expenses = (await ExpenseApi.GetPurchaseExpensesAsync()).Select(x => new PurchaseExpenseRow 
+                        { 
+                            ExpenseMasterId = x.ExpenseMasterId, 
+                            ExpenseName = x.Expense, 
+                            RateType = x.RateType, 
+                            Bearer = x.Bearer,
+                            Rate = x.Rate }).ToList();
+        await AddNewRow();
+    }
+
+    async Task AddNewRow()
+    {
+        var row = new PurchaseItemRow
+        {
+            FilteredProducts = products.ToList()
+        };
+
+        items.Add(row);
+
+        await grid!.Reload();
+
+        editingRow = row;
+        await grid.EditRow(row);
+    }
+
+    async Task OnRowClick(DataGridRowMouseEventArgs<PurchaseItemRow> args)
+    {
+        if (grid == null)
+            return;
+
+        if (editingRow != null && editingRow != args.Data)
+        {
+            await grid.UpdateRow(editingRow);   // commit previous row
+        }
+
+        editingRow = args.Data;
+        await grid.EditRow(args.Data);
+    }
+
+    async Task OnRowUpdate(PurchaseItemRow row)
+    {
+        if (row.ProductId > 0 && row.Qty > 0)
+        {
+            await EnsureLastRow();
+        }
+    }
+    async Task DeleteRow(PurchaseItemRow row)
+    {
+        if (items.Count == 1)
+            return; // Always keep one row
+
+        items.Remove(row);
+
+        await grid!.Reload();
+
+        // Focus last row
+        editingRow = items.Last();
+        await grid.EditRow(editingRow);
+    }
+
+    async Task EnsureLastRow()
+    {
+        if (items.Last().ProductId != 0)
+        {
+            await AddNewRow();
+        }
+    }
+
+    void OnGroupChanged(PurchaseItemRow row)
+    {
+        row.FilteredProducts = products
+            .Where(p => p.ProductGroupId == row.ProductGroupId)
+            .ToList();
+
+        row.ProductId = 0;
+    }
+
+    async Task OnProductChanged(PurchaseItemRow row)
+    {
+        var product = products.First(p => p.ProductId == row.ProductId);
+        row.UnitName = product.UnitName!;
+        row.UnitId = product.UnitId;
+        row.GstPercent = product.GstPercent;
+    }
+
+    decimal ItemTotal => items.Sum(x => x.Amount);
+    decimal ExpenseTotal => expenses.Sum(x => x.Amount);
+    decimal NetAmount => ItemTotal + ExpenseTotal;
+
+    async Task SavePurchase()
+    {
+        if (editingRow != null)
+            await grid!.UpdateRow(editingRow);
+
+        if (!items.Any(x => x.ProductId > 0))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "No Items", "Add at least one item");
+            return;
+        }
+
+        await PurchaseApi.CreateAsync(new PurchaseSaveDto
+        {
+            Header = header,
+            Items = items.Where(x => x.ProductId > 0 && x.Qty > 0).Select(x => new PurchaseItemDto
+            {
+                ProductGroupId = x.ProductGroupId,
+                ProductId = x.ProductId,
+                UnitId = x.UnitId,
+                Qty = x.Qty,
+                Rate = x.Rate,
+                GstPercent = x.GstPercent
+            }).ToList()
+        });
+
+        NotificationService.Notify(NotificationSeverity.Success, "Saved", "Purchase saved successfully");
+
+        ResetForm();
+    }
+
+    async void ResetForm()
+    {
+        header = new PurchaseHeaderDto { PurchaseDate = DateTime.Today };
+        items.Clear();
+        editingRow = null;
+
+        await AddNewRow();
+    }
+}

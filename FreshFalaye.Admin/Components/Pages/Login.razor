@@ -1,0 +1,123 @@
+﻿@page "/login"
+@layout LoginLayout
+@rendermode InteractiveServer
+@using FreshFalaye.Admin.Services
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+
+
+<div class="login-container">
+
+    <div class="login-card">
+
+        <h3 class="text-center mb-3">Fresh फलाय Admin</h3>
+        <p class="text-center text-muted mb-4">Login</p>
+
+        <div class="mb-3">
+            <label>Username</label>
+            <input class="form-control"
+                   @bind="username"
+                   @onkeydown="HandleKeyDown"
+                   autofocus />
+        </div>
+
+        <div class="mb-3">
+            <label>Password</label>
+            <input type="password"
+                   class="form-control"
+                   @bind="password"
+                   @onkeydown="HandleKeyDown" />
+        </div>
+
+        @* <button type="button" class="btn btn-primary w-100"
+                @onclick="TryLogin">
+            Login
+        </button> *@
+
+        <button type="button"
+                class="btn btn-primary w-100"
+                disabled="@isLoggingIn"
+                @onclick="TryLogin">
+            @if (isLoggingIn)
+            {
+                <span class="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true"></span>
+                <span>Logging in...</span>
+             }
+            else
+            {
+                <span>Login</span>
+            }
+        </button>
+
+
+
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="text-danger text-center mt-2">
+                @error
+            </div>
+        }
+
+    </div>
+
+</div>
+
+@code {
+    string username = "";
+    string password = "";
+    string error = "";
+
+    bool isLoggingIn = false;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 🔔 Subscribe to auth state changes
+        Auth.OnChange += StateHasChanged;
+    }
+    void HandleKeyDown(KeyboardEventArgs e)
+    {
+
+        if (isLoggingIn)
+            return;
+
+        if (e.Key == "Enter")
+        {
+            _ = TryLogin();
+        }
+
+    }
+
+    async Task TryLogin()
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        { 
+            error = "Please enter credentials";
+            return;
+        }
+
+        if (isLoggingIn)
+            return;
+
+        error = "";
+        isLoggingIn = true;
+        StateHasChanged();
+        
+
+        var ok = await Auth.LoginAsync(username, password);
+
+
+        isLoggingIn = false;
+
+        if (!ok)
+        {
+            error = "Invalid login credentials";
+            return;
+        }
+
+        Nav.NavigateTo("/dashboard");
+    }
+}

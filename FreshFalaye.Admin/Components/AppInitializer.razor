@@ -1,0 +1,46 @@
+﻿@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+@implements IDisposable
+
+@if (!Auth.IsInitialized)
+{
+    <div>Loading...</div>
+}
+else if (Auth.CurrentUser == null)
+{
+    <!-- redirecting -->
+}
+else
+{
+    @ChildContent(Auth.CurrentUser)
+}
+
+@code {
+    [Parameter]
+    public RenderFragment<AdminUser> ChildContent { get; set; } = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await Auth.InitializeAsync();
+
+        if (Auth.CurrentUser == null)
+        {
+            Nav.NavigateTo("/login", true);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Auth.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Auth.OnChange -= StateHasChanged;
+    }
+}

@@ -1,0 +1,454 @@
+﻿@rendermode InteractiveServer
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject PurchaseApiService PurchaseApi
+@inject ProductGroupApiService ProductGroupApi
+@inject ProductApiService ProductApi
+@inject UnitApiService UnitApi
+@inject PartyApiService PartyApi
+@inject ExpenseMasterApiService ExpenseApi
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject AdminAuthService Auth
+@inject IJSRuntime JS
+@implements IDisposable
+
+<RadzenCard Style="padding:12px">
+
+    <!-- ================= HEADER ================= -->
+    <div class="row g-2">
+
+        <div class="col-md-3">
+            <label class="form-label">Purchase Date</label>
+            <input type="date"
+                   class="form-control form-control-sm"
+                   @bind="header.PurchaseDate" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Supplier</label>
+            <select class="form-select form-select-sm"
+                    @bind="header.PartyId">
+                <option value="">-- select --</option>
+                @foreach (var p in parties)
+                {
+                    <option value="@p.PartyId">@p.PartyName</option>
+                }
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Party Invoice No</label>
+            <input class="form-control form-control-sm"
+                   @bind="header.PartyInvoiceNo" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Invoice No (Internal)</label>
+            <input class="form-control form-control-sm"
+                   @bind="header.InvoiceNo" disabled />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Vehicle No</label>
+            <input class="form-control form-control-sm"
+                   @bind="header.VehicleNo" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Contact Name</label>
+            <input class="form-control form-control-sm"
+                   @bind="header.ContactPersonName" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Contact Number</label>
+            <input class="form-control form-control-sm"
+                   @bind="header.ContactPersonNumber" />
+        </div>
+
+    </div>
+
+    <hr />
+
+    <!-- ================= ITEMS ================= -->
+    <b>Items</b>
+
+    <table class="table table-sm table-bordered mt-1">
+        <thead class="table-light">
+            <tr>
+                <th style="width:40px">#</th>
+                <th>Group</th>
+                <th>Item</th>
+                <th style="width:120px">Packing</th>
+                <th style="width:80px">Qty</th>
+                <th style="width:100px">Rate</th>
+                <th style="width:80px">GST %</th>
+                <th style="width:120px">Amount</th>
+                <th style="width:40px"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < items.Count; i++)
+            {
+                var index = i;
+                var row = items[i];
+                <tr>
+                    <td>@(i + 1)</td>
+
+                    <!-- Product Group -->
+                    <td>
+                        <!-- Product Group -->
+                        <select class="form-select form-select-sm"
+                                value="@row.ProductGroupId"
+                                @onchange="e => OnGroupChanged(e, row)">
+                            <option value="">--</option>
+                            @foreach (var g in productGroups)
+                            {
+                                <option value="@g.ProductGroupId">@g.GroupName</option>
+                            }
+                        </select>
+                    </td>
+
+                    <!-- Product -->
+                    <td>
+                        <!-- Product -->
+                        <select class="form-select form-select-sm"
+                                value="@row.ProductId"
+                                @onchange="e => OnProductChanged(e, row)">
+                            <option value="">--</option>
+                            @foreach (var p in products.Where(p => p.ProductGroupId == row.ProductGroupId))
+                            {
+                                <option value="@p.ProductId">@p.ProductName</option>
+                            }
+                        </select>
+                    </td>
+
+                    <!-- Packing (Unit) -->
+                    <td>
+                        <select class="form-select form-select-sm"
+                                value="@row.UnitId"
+                                @onchange="e => OnUnitChanged(e, row)">
+                            <option value="">--</option>
+                            @foreach (var u in units)
+                            {
+                                <option value="@u.UnitId">@u.UnitName</option>
+                            }
+                        </select>
+                    </td>
+
+                    <!-- Qty -->
+                    <td>
+                        <input type="number"
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.Qty"
+                               @oninput="e => OnQtyChanged(e, row)" />
+                    </td>
+
+                    <!-- Rate -->
+                    <td>
+                        <input type="number"
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.Rate"
+                               @oninput="e => OnRateChanged(e, row)" />
+                    </td>
+
+                    <!-- GST -->
+                    <td class="text-end">@row.GstPercent</td>
+
+                    <!-- Amount -->
+                    <td class="text-end">@row.Amount.ToString("0.00")</td>
+
+                    <!-- Delete -->
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-danger"
+                                @onclick="() => RemoveItem(index)">
+                            ✖
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button class="btn btn-sm btn-secondary"
+            @onclick="AddItem">
+        ➕ Add Item
+    </button>
+
+    <hr />
+
+    <!-- ================= EXPENSES ================= -->
+    <b>Expenses</b>
+
+    <table class="table table-sm table-bordered mt-1">
+        <thead class="table-light">
+            <tr>
+                <th>Expense</th>
+                <th style="width:80px">%</th>
+                <th style="width:100px">Rate</th>
+                <th style="width:120px">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in expenses)
+            {
+                <tr>
+                    <td>@e.Expense</td>
+                    <td>@e.RateType</td>
+                    <td>
+                        <input type="number"
+                               step="0.1"
+                               class="form-control form-control-sm"
+                               value="@e.Rate"
+                               @oninput="ev => OnExpenseRateChanged(ev, e)" />
+                        @* @e.Rate *@
+                    </td>
+                    <td class="text-end">
+                        @CalculateExpense(e).ToString("0.00")
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <hr />
+
+    <!-- ================= TOTALS ================= -->
+    <div class="text-end">
+        <div><b>Item Total:</b> ₹ @ItemTotal.ToString("0.00")</div>
+        <div><b>Expense Total:</b> ₹ @ExpenseTotal.ToString("0.00")</div>
+        <div class="fs-5">
+            <b>Net Amount:</b> ₹ @NetAmount.ToString("0.00")
+        </div>
+    </div>
+
+    <hr />
+
+    <!-- ================= ACTIONS ================= -->
+    <div class="d-flex">
+        <div class="ms-auto">
+            <button class="btn btn-sm btn-primary"
+                    @onclick="Save">
+                Save
+            </button>
+
+            <button class="btn btn-sm btn-secondary ms-1"
+                    @onclick="Close">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+</RadzenCard>
+
+@code {
+
+    [Parameter] public int? PurchaseId { get; set; }
+
+    PurchaseHeaderDto header = new()
+    {
+        PurchaseDate = DateTime.Today
+    };
+
+    bool dataLoaded;
+
+    List<PurchaseItemDto> items = new();
+    List<PurchaseExpenseDto> expenses = new();
+    DotNetObjectReference<PurchaseDialog>? objRef;
+ 
+    List<ProductGroupDto> productGroups = new();
+    List<ProductDto> products = new();
+    List<UnitDto> units = new();
+    List<PartyDto> parties = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        productGroups = await ProductGroupApi.GetGroupsAsync();
+        products = await ProductApi.GetProductsAsync();
+        units = await UnitApi.GetUnitsAsync();
+        parties = await PartyApi.GetPartiesAsync();
+        expenses = await ExpenseApi.GetPurchaseExpensesAsync();
+
+        if (PurchaseId.HasValue)
+        {
+            var dto = await PurchaseApi.GetAsync(PurchaseId.Value);
+            header = dto.Header;
+            items = dto.Items;
+            expenses = dto.Expenses;
+        }
+        else
+        {
+            AddItem();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }            
+        }
+    }
+
+
+    void OnGroupChanged(ChangeEventArgs e, PurchaseItemDto row)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var groupId))
+        {
+            row.ProductGroupId = groupId;
+
+            // Reset product when group changes
+            row.ProductId = 0;
+            row.Rate = 0;
+            row.Amount = 0;
+        }
+    }
+    
+    void OnUnitChanged(ChangeEventArgs e, PurchaseItemDto row)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var unitId))
+            row.UnitId = unitId;
+    }
+
+   
+
+    void OnExpenseRateChanged(ChangeEventArgs ev, PurchaseExpenseDto e)
+    {
+        if (decimal.TryParse(ev.Value?.ToString(), out var rate))
+        {
+            e.Rate = rate;
+        }
+
+        // No need to explicitly call StateHasChanged
+        // Blazor will re-render automatically
+    }
+
+    void AddItem()
+    {
+        items.Add(new PurchaseItemDto
+        {
+            Qty = 1
+        });
+    }
+
+    void RemoveItem(int index)
+    {
+        items.RemoveAt(index);
+    }
+
+    void OnProductChanged(ChangeEventArgs e, PurchaseItemDto row)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var productId))
+            return;
+
+        row.ProductId = productId;
+
+        var product = products.FirstOrDefault(p => p.ProductId == productId);
+        if (product != null)
+        {
+            row.GstPercent = product.GstPercent;
+            row.Rate = product.SalePrice; // optional default
+        }
+
+        Recalculate(row);
+    }
+
+    void OnQtyChanged(ChangeEventArgs e, PurchaseItemDto row)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var qty))
+            row.Qty = qty;
+
+        Recalculate(row);
+    }
+
+    void OnRateChanged(ChangeEventArgs e, PurchaseItemDto row)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var rate))
+            row.Rate = rate;
+
+        Recalculate(row);
+    }
+
+    void Recalculate(PurchaseItemDto row)
+    {
+        row.Amount = row.Qty * row.Rate;
+    }
+
+    decimal CalculateExpense(PurchaseExpenseDto e)
+        => e.RateType == "%"
+            ? ItemTotal * e.Rate / 100
+            : e.Rate;
+
+    decimal ItemTotal => items.Sum(x => x.Amount);
+    decimal ExpenseTotal => expenses.Sum(CalculateExpense);
+    decimal NetAmount => ItemTotal + ExpenseTotal;
+
+    async Task Save()
+    {
+        try
+        {
+            var dto = new PurchaseSaveDto
+            {
+                Header = header,
+                Items = items,
+                Expenses = expenses
+            };
+
+            if (PurchaseId == null)
+                await PurchaseApi.CreateAsync(dto);
+            else
+                await PurchaseApi.UpdateAsync(dto);
+
+            DialogService.Close(true);
+        }
+        catch (ApiException ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    void Close() => DialogService.Close();
+}

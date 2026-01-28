@@ -1,0 +1,171 @@
+﻿@page "/dashboard"
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@layout MainLayout
+@inject AdminAuthService Auth
+@inject IDashboardService DashboardService
+
+<PageTitle>Admin Dashboard</PageTitle>
+<AppInitializer Context="user">
+    @* <h3>Welcome @user.Username</h3>
+    <p>Role: @user.Role</p> *@    
+    <RadzenHeading Size="H4" Text="Dashboard" Style="margin-bottom:20px" />
+
+    @if (isLoading || !canRenderCharts)
+    {
+        <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" />
+    }
+    else
+    {
+        <!-- KPI CARDS -->
+        <RadzenRow Style="margin-bottom:20px">
+            <RadzenColumn Size="3">
+                <RadzenCard>
+                    <h6>Today Sales</h6>
+                    <h4>₹ @kpis.TodaySales</h4>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="3">
+                <RadzenCard>
+                    <h6>This Month</h6>
+                    <h4>₹ @kpis.MonthSales</h4>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="3">
+                <RadzenCard>
+                    <h6>Total Bills</h6>
+                    <h4>@kpis.BillCount</h4>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="3">
+                <RadzenCard>
+                    <h6>Avg Bill Value</h6>
+                    <h4>₹ @kpis.AvgBillValue</h4>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow Style="margin-bottom:20px">
+            <RadzenColumn Size="8">
+                <RadzenCard>
+                    <h6>Sales Trend (Last 7 Days)</h6>
+
+                     <RadzenChart>
+                        <RadzenChartTooltipOptions Visible="true" Shared="true" />
+                        <RadzenLineSeries Data="@salesTrend"
+                                          CategoryProperty="DateLabel"
+                                          ValueProperty="TotalAmount"
+                                          Title="Sales"                                          
+                                          LineType="LineType.Solid"
+                                          StrokeWidth="2"
+                                          Stroke="#2E7D32">
+                            <RadzenMarkers Visible="true" MarkerType="MarkerType.Square" />
+                            <RadzenSeriesDataLabels Visible="true" />
+                                      </RadzenLineSeries>
+                        @* <RadzenCategoryAxis FormatString="{0:dd MMM}" /> *@
+                        <RadzenCategoryAxis FormatString="{0:dd MMM}" Padding="20" />
+                        <RadzenValueAxis>
+                            <RadzenGridLines Visible="true" />
+                            <RadzenAxisTitle Text="Sales in Rupees(₹)" />
+                        </RadzenValueAxis>
+                        
+                        
+                    </RadzenChart>
+                    
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="4">
+                <RadzenCard>
+                    <h6>Payment Mode</h6>
+                    <RadzenChart>
+                        <RadzenPieSeries Data="@paymentBreakdown" Title="Payment Modes" CategoryProperty="PaymentMode" ValueProperty="Amount">
+                            <RadzenSeriesDataLabels Visible="true" />
+                        </RadzenPieSeries>
+                    </RadzenChart>
+                    
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <!-- TOP ITEMS + LOW STOCK -->
+        <RadzenRow>
+            <RadzenColumn Size="6">
+                <RadzenCard>
+                    <h6>Top Selling Items</h6>
+
+                    <RadzenChart>
+                        <RadzenChartTooltipOptions Visible="true" Shared="true" />
+                        <RadzenColumnSeries Data="@topItems"
+                                            CategoryProperty="ItemName"
+                                            ValueProperty="Quantity"
+                                            Title="Quantity Sold"                                             
+                                            Fill="Orange">
+                            <RadzenMarkers Visible="true" MarkerType="MarkerType.Square" />
+                            <RadzenSeriesDataLabels Visible="true" />
+                                        </RadzenColumnSeries>
+                        <RadzenCategoryAxis />
+                        <RadzenValueAxis />
+                    </RadzenChart>
+                </RadzenCard>
+            </RadzenColumn>
+
+            <RadzenColumn Size="6">
+                <RadzenCard>
+                    <h6>Low Stock Items</h6>
+
+                    <RadzenChart>
+                        <RadzenBarSeries Data="@lowStockItems"
+                                         CategoryProperty="ItemName"
+                                         ValueProperty="CurrentQty"
+                                         Fill="Red"
+                                         Title="Current Stock">
+                                         <RadzenMarkers Visible="true" MarkerType="MarkerType.Square"/>
+                            <RadzenSeriesDataLabels Visible="true" />
+                                     </RadzenBarSeries>
+                        <RadzenCategoryAxis />
+                        <RadzenValueAxis />
+                    </RadzenChart>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+    }
+</AppInitializer>
+@code {
+    private bool isLoading = true;
+
+
+    private bool canRenderCharts;
+    private DashboardKpiDto kpis = new();
+    private List<SalesTrendDto> salesTrend = new();
+    private List<PaymentBreakdownDto> paymentBreakdown = new();
+    private List<TopItemSalesDto> topItems = new();
+    private List<LowStockDto> lowStockItems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        kpis = await DashboardService.GetKpisAsync();
+        salesTrend = await DashboardService.GetSalesTrendAsync(7);
+        paymentBreakdown = await DashboardService.GetPaymentBreakdownAsync();
+        topItems = await DashboardService.GetTopItemsAsync();
+        lowStockItems = await DashboardService.GetLowStockItemsAsync();
+
+        isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            canRenderCharts = true;
+            StateHasChanged();
+        }
+    }
+
+}

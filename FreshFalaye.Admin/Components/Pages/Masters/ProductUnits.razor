@@ -1,0 +1,227 @@
+﻿@page "/masters/product-units"
+@rendermode InteractiveServer
+@using FreshFalaye.Admin.Components.Layout
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@layout MainLayout
+
+@inject UnitApiService UnitApi
+@inject DialogService DialogService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+<div tabindex="0"
+     style="outline:none;height:100%"
+     @ref="gridContainer"
+     @onkeydown="HandleGridKeys"
+     @onkeydown:preventDefault="true">
+
+    <RadzenCard>
+
+        <div class="d-flex mb-1">
+            <b class="me-auto">Product Units</b>
+
+            <RadzenButton Text="Add (Alt+A)"
+                          Icon="add"
+                          ButtonType="ButtonType.Button"
+                          AccessKey="A"
+                          Size="ButtonSize.Small"
+                          Click="@AddUnit" />
+        </div>
+
+        <RadzenDataGrid Data="@units"
+                        TItem="UnitDto"
+                        @ref="grid"
+                        AllowPaging="true"
+                        PageSize="15"
+                        AllowRowSelectOnRowClick="true"
+                        SelectionMode="DataGridSelectionMode.Single"
+                        Value="@selectedUnits"
+                        ValueChanged="@OnSelectedUnitsChanged"
+                        RowDoubleClick="@OnRowDoubleClick"
+                        RowClick="@OnRowClick"
+                        Style="height:70vh">
+
+            <Columns>
+                <RadzenDataGridColumn TextAlign="TextAlign.Center" Property="UnitCode" Title="Code" Width="80px" />
+                <RadzenDataGridColumn TextAlign="TextAlign.Left" Property="UnitName" Title="Unit Name" />
+            </Columns>
+
+        </RadzenDataGrid>
+
+    </RadzenCard>
+</div>
+
+
+
+
+
+@code {
+
+    List<UnitDto> units = new();
+    ElementReference gridContainer;
+
+    bool gridInitialized;
+    RadzenDataGrid<UnitDto> grid;
+
+    IList<UnitDto> selectedUnits = new List<UnitDto>();
+    UnitDto? SelectedUnit => selectedUnits.FirstOrDefault();
+    int selectedIndex = -1;
+    bool dataLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadAndInitializeAsync();
+            }
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender &&
+            !dataLoaded &&
+            Auth.IsInitialized &&
+            Auth.CurrentUser != null)
+        {
+            await LoadAndInitializeAsync();
+        }       
+    }
+    async Task LoadAndInitializeAsync()
+    {
+        dataLoaded = true;
+        units = await UnitApi.GetUnitsAsync();
+        InitializeSelection();
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+    void InitializeSelection()
+    {
+        selectedUnits.Clear();
+
+        if (units.Count > 0)
+        {
+            selectedIndex = 0;
+            selectedUnits.Add(units[0]);
+            grid?.SelectRow(units[0]);
+        }
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+    }
+
+    void OnSelectedUnitsChanged(IList<UnitDto> unitsSelected)
+    {
+        selectedUnits = unitsSelected;
+
+        var view = grid.View.Cast<UnitDto>().ToList();
+        var unit = SelectedUnit;
+
+        if (unit != null)
+            selectedIndex = view.IndexOf(unit);
+    }
+
+    async Task LoadUnits()
+    {
+        units = await UnitApi.GetUnitsAsync();
+    }
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<UnitDto> args)
+    {
+        await EditUnit(args.Data);
+    }
+    
+    async Task OnRowClick(DataGridRowMouseEventArgs<UnitDto> args)
+    {
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+    
+    async Task AddUnit()
+    {
+        try
+        {
+            await DialogService.OpenAsync<UnitDialog>(
+            "Add Unit",
+            null,
+            new DialogOptions { Width = "520px", CloseDialogOnEsc = true,Draggable = true,Resizable = false });
+
+            await LoadUnits();
+        }
+        catch (Exception ex)
+        {
+            
+            throw;
+        }
+        
+    }
+
+    async Task EditUnit(UnitDto unit)
+    {
+        await DialogService.OpenAsync<UnitDialog>(
+            "Edit Unit",
+            new Dictionary<string, object> { { "UnitId", unit.UnitId } },
+            new DialogOptions { Width = "520px", CloseDialogOnEsc = true, Draggable = true, Resizable = false });
+
+        await LoadUnits();
+    }
+
+    async Task HandleGridKeys(KeyboardEventArgs e)
+    {
+        var view = grid.View.Cast<UnitDto>().ToList();
+        if (view.Count == 0)
+            return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                selectedIndex++;
+                if (selectedIndex >= view.Count)
+                    selectedIndex = 0;
+
+                SelectRowByIndex();
+                break;
+
+            case "ArrowUp":
+                selectedIndex--;
+                if (selectedIndex < 0)
+                    selectedIndex = view.Count - 1;
+
+                SelectRowByIndex();
+                break;
+
+            case "Enter":
+                if (SelectedUnit != null)
+                    await EditUnit(SelectedUnit);
+                break;
+        }
+    }
+
+
+    void SelectRowByIndex()
+    {
+        var view = grid.View.Cast<UnitDto>().ToList();
+
+        if (view.Count == 0)
+            return;
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        if (selectedIndex >= view.Count)
+            selectedIndex = view.Count - 1;
+
+        selectedUnits.Clear();
+        selectedUnits.Add(view[selectedIndex]);
+    }
+
+}

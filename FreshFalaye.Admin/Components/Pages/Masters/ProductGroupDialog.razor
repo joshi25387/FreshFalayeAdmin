@@ -1,0 +1,243 @@
+﻿@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+
+@inject ProductGroupApiService GroupApi
+@inject DialogService DialogService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+
+@implements IDisposable
+
+<AppInitializer Context="user">
+
+    <RadzenCard Style="padding:10px">
+
+        <div class="row g-2">
+
+            <div class="col-12">
+                <RadzenLabel Text="Group Name" />
+                <RadzenTextBox @bind-Value="model.GroupName"
+                               Style="width:100%"
+                               @ref="nameBox" />
+            </div>
+
+            <div class="col-12">
+                <RadzenLabel Text="Parent Group" />
+                <RadzenDropDown Data="@allGroups"
+                                TextProperty="GroupName"
+                                ValueProperty="ProductGroupId"
+                                @bind-Value="model.ParentGroupId"
+                                AllowClear="true"
+                                Style="width:100%" />
+            </div>
+
+        </div>
+
+        <div class="mt-3 d-flex">
+
+            @if (GroupId.HasValue)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
+
+            <div class="ms-auto">
+                <RadzenButton Text="Save (Alt+S)"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@SaveClick" />
+
+                <RadzenButton Text="Cancel (Esc)"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@Close"
+                              Style="margin-left:5px" />
+            </div>
+        </div>
+
+    </RadzenCard>
+
+</AppInitializer>
+
+@code {
+
+    /* ---------------- Parameters ---------------- */
+
+    [Parameter] public int? GroupId { get; set; }
+
+    /* ---------------- State ---------------- */
+
+    ProductGroupDto model = new();
+    List<ProductGroupDto> allGroups = new();
+
+    RadzenTextBox? nameBox;
+    DotNetObjectReference<ProductGroupDialog>? objRef;
+
+    bool dataLoaded;
+
+    /* ---------------- Lifecycle ---------------- */
+
+    protected override void OnInitialized()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // if (firstRender)
+        // {
+        //     objRef = DotNetObjectReference.Create(this);
+        //     await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+        //     await InvokeAsync(() => nameBox?.FocusAsync());
+        // }
+
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+
+            await InvokeAsync(() => nameBox?.FocusAsync());
+        }
+    }
+
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        allGroups = await GroupApi.GetGroupsAsync();
+
+        if (GroupId.HasValue)
+        {
+            model = allGroups
+                        .FirstOrDefault(g => g.ProductGroupId == GroupId.Value)
+                    ?? new ProductGroupDto();
+
+            allGroups = allGroups
+                .Where(g => g.ProductGroupId != GroupId.Value)
+                .ToList();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /* ---------------- JS Shortcuts ---------------- */
+
+    [JSInvokable]
+    public async Task OnAltS() => await SaveClick();
+
+    [JSInvokable]
+    public Task OnEsc()
+    {
+        Close();
+        return Task.CompletedTask;
+    }
+
+    /* ---------------- Actions ---------------- */
+
+    async Task SaveClick()
+    {
+        try
+        {
+            model.BranchId = Auth.CurrentUser?.BranchId ?? 0;
+            model.GroupName = model.GroupName?.Trim();
+
+            if (string.IsNullOrWhiteSpace(model.GroupName))
+            {
+                ShowError("Please enter Product Group");
+                return;
+            }
+
+            var response = GroupId == null
+                            ? await GroupApi.CreateAsync(model)
+                            : await GroupApi.UpdateAsync(model.ProductGroupId, model);
+
+            await HandleApiResponse(response);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // reload grid / close dialog / reset form
+                StateHasChanged();
+                DialogService.Close();
+            }
+        }
+        catch (HttpRequestException)
+        {
+            ShowError("Unable to connect to server");
+        }                       
+    }
+
+    async Task DeleteClick()
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete group '{model.GroupName}'?",
+            "Confirm Delete");
+
+        if (confirm == true)
+        {
+            var response = await GroupApi.DeleteAsync(model.ProductGroupId);
+            await HandleApiResponse(response);            
+            StateHasChanged();
+            DialogService.Close();
+        }
+    }
+
+
+    void ShowSuccess(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Success,
+            Summary = "Success",
+            Detail = message,
+            Duration = 2000
+        });
+    }
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+
+
+    void Close() => DialogService.Close();
+}

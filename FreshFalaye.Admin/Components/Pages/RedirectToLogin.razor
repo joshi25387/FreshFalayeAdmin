@@ -1,0 +1,21 @@
+﻿@inject NavigationManager Nav
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (firstRender)
+            {
+                await Task.Yield(); // allow render to complete
+                Nav.NavigateTo("/login", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            
+            throw;
+        }
+        
+    }
+}

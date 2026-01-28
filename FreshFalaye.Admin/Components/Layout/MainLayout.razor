@@ -1,0 +1,101 @@
+﻿@using FreshFalaye.Admin.Components.Pages
+@using FreshFalaye.Admin.Services
+
+@inherits LayoutComponentBase
+@inject AdminAuthService Auth
+
+@inject NavigationManager Nav
+
+<RadzenDialog />
+<RadzenNotification />
+<RadzenTooltip />
+<RadzenContextMenu />
+
+
+    
+<RadzenLayout Style="height:100vh">
+
+        <!-- TOP MENU BAR -->
+    <RadzenHeader Style="background:#0f172a;color:white;height:42px">
+        <div class="d-flex align-items-center px-2" style="height:42px">
+
+            <b class="me-4">Fresh फलाय Admin</b>
+
+            @if (Auth.CurrentUser != null)
+            {
+                <RadzenMenu Style="background:transparent;color:white">
+                    
+                    <RadzenMenuItem Text="Dashboard" Path="/dashboard" />
+                    
+                    <RadzenMenuItem Text="Masters">
+                        <RadzenMenuItem Text="Product Units" Path="/masters/product-units" />
+                        <RadzenMenuItem Text="Product Groups" Path="/masters/product-groups" />
+                        <RadzenMenuItem Text="Parties" Path="/masters/parties" />
+                        <RadzenMenuItem Text="Expenses" Path="/masters/expenses" />
+                        <RadzenMenuItem Text="Products" Path="/masters/products" />
+                    </RadzenMenuItem>
+
+                    <RadzenMenuItem Text="Stock">
+                        <RadzenMenuItem Text="Purchase Entry" Path="/stock/purchase" />
+                    </RadzenMenuItem>
+
+                    @* <RadzenMenuItem Text="Reports">
+                        <RadzenMenuItem Text="Stock Report" Path="/reports/stock" />
+                        <RadzenMenuItem Text="Purchase Report" Path="/reports/purchase" />
+                    </RadzenMenuItem> *@
+                </RadzenMenu>
+
+                <div class="ms-auto d-flex align-items-center">
+                    <span class="me-3">
+                        Welcome @Auth.CurrentUser.Username
+                    </span>
+
+                    <RadzenButton Icon="logout"
+                                  Text="Logout"
+                                  Size="ButtonSize.Small"
+                                  Click="@Logout"
+                                  ButtonStyle="ButtonStyle.Light" />
+                </div>
+            }
+        </div>
+    </RadzenHeader>
+
+
+
+    <!-- PAGE CONTENT -->
+    <RadzenBody>
+        <RadzenMain Style="padding:8px">
+
+            @Body
+
+        </RadzenMain>
+    </RadzenBody>
+
+</RadzenLayout>
+
+
+
+
+@code {
+    protected override void OnInitialized()
+    {
+        Auth.OnChange += StateHasChanged;        
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        await Auth.InitializeAsync();       
+    }
+
+    public void Dispose()
+    {
+        Auth.OnChange -= StateHasChanged;
+    }
+    async Task Logout()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/login", true);
+    }
+}

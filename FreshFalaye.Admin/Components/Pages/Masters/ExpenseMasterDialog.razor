@@ -1,0 +1,247 @@
+﻿@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+@inject ExpenseMasterApiService ExpenseApi
+@inject DialogService DialogService
+@inject IJSRuntime JS
+
+@inject AdminAuthService Auth
+@implements IDisposable
+
+<RadzenCard Style="padding:10px">
+
+    <div class="row g-2">
+
+        <div class="col-6">
+            <RadzenLabel Text="Expense Type" />
+            <RadzenDropDown Data="@expenseTypes"
+                            @bind-Value="model.ExpenseType"
+                            Style="width:100%"
+                            @ref="typeBox" />
+        </div>
+
+        <div class="col-6">
+            <RadzenLabel Text="Bearer" />
+            <RadzenDropDown Data="@bearers"
+                            @bind-Value="model.Bearer"
+                            Style="width:100%" />
+        </div>
+
+        <div class="col-12">
+            <RadzenLabel Text="Expense Name" />
+            <RadzenTextBox @bind-Value="model.ExpenseName"
+                           Style="width:100%" />
+        </div>
+
+        <div class="col-4">
+            <RadzenLabel Text="Rate Type" />
+            <RadzenDropDown Data="@rateTypes"
+                            @bind-Value="model.RateType"
+                            Style="width:100%" />
+        </div>
+
+        <div class="col-4">
+            <RadzenLabel Text="Rate" />
+            <RadzenNumeric @bind-Value="model.Rate"
+                           Style="width:100%"
+                           Format="0.00" />
+        </div>
+
+        <div class="col-4 d-flex align-items-end">
+            <RadzenCheckBox @bind-Value="model.IsTaxable" />
+            <RadzenLabel Text="Taxable" Style="margin-left:6px" />
+        </div>
+
+    </div>
+
+    <div class="mt-3 d-flex">
+
+        <!-- LEFT: DELETE -->
+        @if (Id != null)
+        {
+            <RadzenButton Text="Delete (Del)"
+                          Icon="delete"
+                          ButtonStyle="ButtonStyle.Danger"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@DeleteClick" />
+        }
+
+        <!-- RIGHT: SAVE / CANCEL -->
+        <div class="ms-auto">
+            <RadzenButton Text="Save (Alt+S)"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@SaveClick" />
+
+            <RadzenButton Text="Cancel (Esc)"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@Close"
+                          Style="margin-left:5px" />
+        </div>
+    </div>
+
+</RadzenCard>
+
+@code {
+
+    [Parameter] public int? Id { get; set; }
+
+    ExpenseMasterDto model = new();
+
+    RadzenDropDown<string> typeBox;
+    DotNetObjectReference<ExpenseMasterDialog>? objRef;
+
+    bool dataLoaded;
+
+    List<string> expenseTypes = new() { "Sale", "Purchase" };
+    List<string> rateTypes = new() { "#", "%" };
+    List<string> bearers = new() { "Self", "Customer" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        if (Id.HasValue)
+        {
+            model = (await ExpenseApi.GetAllAsync())
+                .First(x => x.Id == Id.Value);
+        }
+        else
+        {
+            model.ExpenseType = "Purchase";
+            model.RateType = "#";
+            model.Bearer = "Self";
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+
+            await typeBox.FocusAsync();
+        }
+    }
+
+    // ---------- Keyboard Shortcuts ----------
+
+    [JSInvokable]
+    public async Task OnAltS()
+    {
+        await SaveClick();
+    }
+
+    [JSInvokable]
+    public Task OnEsc()
+    {
+        Close();
+        return Task.CompletedTask;
+    }
+
+    // ---------- Actions ----------
+
+    async Task SaveClick()
+    {
+
+        if (string.IsNullOrWhiteSpace(model.ExpenseName))
+        {
+            ShowError("Please enter Expense Name");
+            return;    
+        }
+        else if (string.IsNullOrWhiteSpace(model.ExpenseType))
+        {
+            ShowError("Please select Expense Type");
+            return;
+        }        
+
+        model.ExpenseName = model.ExpenseName.Trim();
+        var response = await ExpenseApi.SaveAsync(model);
+        await HandleApiResponse(response);
+        StateHasChanged();
+        DialogService.Close();
+    }
+
+    async Task DeleteClick()
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete expense '{model.ExpenseName}'?",
+            "Confirm Delete",
+            new ConfirmOptions
+            {
+                OkButtonText = "Yes",
+                CancelButtonText = "No"
+            });
+
+        if (confirm == true)
+        {
+            var response = await ExpenseApi.DeleteAsync(model.Id);
+            await HandleApiResponse(response);
+            StateHasChanged();
+            DialogService.Close();
+        }
+    }
+
+    void ShowSuccess(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Success,
+            Summary = "Success",
+            Detail = message,
+            Duration = 2000
+        });
+    }
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+
+    void Close() => DialogService.Close();
+}

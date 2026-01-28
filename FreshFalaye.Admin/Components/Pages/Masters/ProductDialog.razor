@@ -1,0 +1,424 @@
+﻿@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@using System.Text.Json
+@inherits BasePage
+
+@inject ProductApiService ProductApi
+@inject ProductGroupApiService GroupApi
+@inject UnitApiService UnitApi
+@inject DialogService DialogService
+@inject IJSRuntime JS
+@inject ApiSettings ApiSettings
+
+@inject AdminAuthService Auth
+@implements IDisposable
+
+<RadzenCard Style="padding:10px">
+
+    <div class="row g-2">
+
+        <div class="col-6">
+            <RadzenLabel Text="Product Name" />
+            <RadzenTextBox @bind-Value="model.ProductName"
+                           Style="width:100%"
+                           @ref="nameBox" />
+        </div>
+
+        <div class="col-6">
+            <RadzenLabel Text="Product Group" />
+            <RadzenDropDown Data="@groups"
+                            TextProperty="GroupName"
+                            ValueProperty="ProductGroupId"
+                            @bind-Value="model.ProductGroupId"
+                            Style="width:100%" />
+        </div>
+
+        <div class="col-6">
+            <RadzenLabel Text="Unit" />
+            <RadzenDropDown Data="@units"
+                            TextProperty="UnitName"
+                            ValueProperty="UnitId"
+                            @bind-Value="model.UnitId"
+                            Style="width:100%" />
+        </div>
+        <div class="col-6">
+            <RadzenLabel Text="MRP" />
+            <RadzenNumeric TValue="decimal" @bind-Value="model.Mrp"
+                           Style="width:100%"
+                           Format="0.00"
+                           Change="@OnMrpChanged" />
+        </div>
+
+        <div class="col-6">
+            <RadzenLabel Text="Discount %" />
+            <RadzenNumeric TValue="decimal" @bind-Value="model.Discount"
+                           Style="width:100%"
+                           Format="0.00"
+                           Min="0"
+                           Max="100"
+                           Change="@OnDiscountChanged" />
+        </div>
+
+        <div class="col-6">
+            <RadzenLabel Text="Sale Price" />
+            <RadzenNumeric TValue="decimal" @bind-Value="model.SalePrice"
+                           Style="width:100%"
+                           Format="0.00" 
+                           Change="@OnRateChanged" />
+        </div>
+        <div class="col-6">
+            <RadzenLabel Text="Minimum Stock" />
+            <RadzenNumeric @bind-Value="model.MinimumStock"
+                           Style="width:100%"
+                           Format="0" />
+        </div>
+        <div class="col-6">
+            <RadzenLabel Text="GST %" />
+            <RadzenNumeric @bind-Value="model.GstPercent"
+                           Style="width:100%"
+                           Format="0.00" />
+        </div>
+        <div class="col-12 mt-2">
+            <RadzenLabel Text="Product Image" />
+
+            <div class="d-flex align-items-center gap-3">
+
+                <img src="@GetImageUrl()"
+                     style="width:80px;height:80px;object-fit:cover;border:1px solid #ccc" />
+
+                
+                <RadzenUpload Url="@UploadUrl"
+                              Auto="true"
+                              ChooseText="Select Image"
+                              Style="width:200px"
+                              Accept="image/*"
+                              WithCredentials="false"
+                              Complete="@OnUploadComplete"                              
+                              Disabled="@(!ProductId.HasValue)" />
+            </div>
+
+            @if (!ProductId.HasValue)
+            {
+                <small class="text-muted">
+                    Save product first to enable image upload
+                </small>
+            }
+        </div>
+
+
+    </div>
+
+    <div class="mt-3 d-flex">
+
+        @if (ProductId != null)
+        {
+            <RadzenButton Text="Delete (Del)"
+                          Icon="delete"
+                          ButtonStyle="ButtonStyle.Danger"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@DeleteClick" />
+        }
+
+        <div class="ms-auto">
+            <RadzenButton Text="Save (Alt+S)"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@SaveClick" />
+
+            <RadzenButton Text="Cancel (Esc)"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@Close"
+                          Style="margin-left:5px" />
+        </div>
+    </div>
+
+</RadzenCard>
+
+@code {
+
+    [Parameter] public int? ProductId { get; set; }
+
+    ProductDto model = new();
+
+    RadzenTextBox nameBox;
+    DotNetObjectReference<ProductDialog>? objRef;
+
+    List<ProductGroupDto> groups = new();
+    List<UnitDto> units = new();
+    bool dataLoaded;
+
+    string UploadUrl =>
+    ProductId.HasValue
+        ? $"{ApiBaseUrl}/api/products/{ProductId.Value}/image"        
+        : string.Empty;
+
+    string ApiBaseUrl => ApiSettings.BaseUrl.TrimEnd('/');
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        groups = await GroupApi.GetGroupsAsync();
+        units = await UnitApi.GetUnitsAsync();
+
+        if (ProductId.HasValue)
+        {
+            model = await ProductApi.GetProductAsync(ProductId.Value);
+            RecalculateFromRate();
+        }
+
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+    async Task OnUploadComplete(UploadCompleteEventArgs args)
+    {
+        if (ProductId.HasValue)
+        {
+            // Re-load product to get updated ImagePath
+            model = await ProductApi.GetProductAsync(ProductId.Value);
+            StateHasChanged();
+        }
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+
+            await nameBox.FocusAsync();
+        }
+    }
+    void ShowSuccess(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Success,
+            Summary = "Success",
+            Detail = message,
+            Duration = 2000
+        });
+    }
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+    string GetImageUrl()
+    {
+        if (string.IsNullOrEmpty(model.ImagePath))
+            return "/images/no-image.jpg"; // add default image
+
+        return model.ImagePath;        
+    }
+
+    [JSInvokable]
+    public async Task OnAltS()
+    {
+        await SaveClick();
+    }
+
+    [JSInvokable]
+    public Task OnEsc()
+    {
+        Close();
+        return Task.CompletedTask;
+    }
+
+    async Task SaveClick()
+    {
+        try
+        {
+            model.BranchId = Auth.CurrentUser?.BranchId ?? 0;
+
+            if(string.IsNullOrWhiteSpace(model.ProductName))
+            {
+                ShowError("Please enter Product Name");
+                return;
+            }
+            else if (model.ProductGroupId<=0)
+            {
+                ShowError("Please select Product Group");
+                return;
+            }
+            else if (model.UnitId <= 0)
+            {
+                ShowError("Please select Unit");
+                return;
+            }
+            else if (model.Mrp <= 0)
+            {
+                ShowError("Please enter MRP");
+                return;
+            }
+            else if (model.SalePrice <= 0 || model.SalePrice > model.Mrp)
+            {
+                ShowError("Invalid Rate");
+                return;
+            }                        
+            else if (model.MinimumStock <= 0)
+            {
+                ShowError("Please enter Minimum Stock");
+                return;
+            }
+
+            model.ProductName = model.ProductName.Trim();
+            HttpResponseMessage response;
+            if (ProductId == null)
+            {
+                response = await ProductApi.CreateAsync(model);
+
+                // reload product so ProductId is available for image upload
+                var latest = (await ProductApi.GetProductsAsync())
+                                .OrderByDescending(x => x.ProductId)
+                                .First();
+
+                ProductId = latest.ProductId;
+                model = latest;
+                await HandleApiResponse(response);
+
+                StateHasChanged();
+            }
+            else
+            {
+                response = await ProductApi.UpdateAsync(model.ProductId, model);
+                await HandleApiResponse(response);
+                StateHasChanged();                
+                DialogService.Close();
+            }
+
+        }
+        catch(HttpRequestException)
+        {
+            ShowError("Unable to connect to server");
+        }
+    }
+    void OnMrpChanged(decimal value)
+    {
+        //model.Mrp = value;
+        RecalculateFromDiscount();
+    }
+
+    void OnDiscountChanged(decimal value)
+    {
+        //model.Discount = value;
+        RecalculateFromDiscount();
+    }
+
+    void OnRateChanged(decimal value)
+    {
+        //model.SalePrice = value;
+        RecalculateFromRate();
+        StateHasChanged();
+    }
+    void RecalculateFromDiscount()
+    {
+        if (model.Mrp <= 0)
+        {
+            model.SalePrice = 0;
+            model.Discount = 0;
+            return;
+        }
+
+        var discount = model.Discount;
+        discount = Math.Clamp(discount, 0, 100);
+
+        model.Discount = discount;
+
+        model.SalePrice = Math.Round(
+            model.Mrp - (model.Mrp * discount / 100),
+            2
+        );
+    }
+
+    void RecalculateFromRate()
+    {
+        if (model.Mrp <= 0)
+        {
+            model.Discount = 0;
+            return;
+        }
+
+        var rate = model.SalePrice;
+        rate = Math.Clamp(rate, 0, model.Mrp);
+
+        model.SalePrice = rate;
+
+        model.Discount = Math.Round(
+            ((model.Mrp - rate) / model.Mrp) * 100,
+            2
+        );
+    }
+
+    async Task DeleteClick()
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete product '{model.ProductName}'?",
+            "Confirm Delete",
+            new ConfirmOptions
+            {
+                OkButtonText = "Yes",
+                CancelButtonText = "No"
+            });
+
+        if (confirm == true)
+        {
+            var response = await ProductApi.DeleteAsync(model.ProductId);
+            await HandleApiResponse(response);
+            StateHasChanged();
+            DialogService.Close();
+        }
+    }
+
+    void Close() => DialogService.Close();
+
+    class ImageUploadResult
+    {
+        public string? ImagePath { get; set; }
+    }
+}

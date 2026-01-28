@@ -1,0 +1,242 @@
+﻿@page "/masters/products"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject ProductApiService ProductApi
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+<div tabindex="0"
+     style="outline:none;height:100%"
+     @ref="gridContainer"
+     @onkeydown="HandleGridKeys"
+     @onkeydown:preventDefault="true">
+
+    <RadzenCard>
+
+        <div class="d-flex mb-1">
+            <b class="me-auto">Product Master</b>
+
+            <RadzenButton Text="Add (Alt+A)"
+                          Icon="add"
+                          ButtonType="ButtonType.Button"
+                          AccessKey="A"
+                          Size="ButtonSize.Small"
+                          Click="@AddProduct" />
+        </div>
+
+        <RadzenDataGrid Data="@products"
+                        TItem="ProductDto"
+                        @ref="grid"
+                        AllowPaging="true"
+                        PageSize="15"
+                        AllowRowSelectOnRowClick="true"
+                        SelectionMode="DataGridSelectionMode.Single"
+                        Value="@selectedProducts"
+                        ValueChanged="@OnSelectedProductsChanged"
+                        RowDoubleClick="@OnRowDoubleClick"
+                        RowClick="@OnRowClick"
+                        Style="height:70vh">
+
+            <Columns>
+
+                <RadzenDataGridColumn Property="ProductName"
+                                      Title="Product Name" />
+
+                <RadzenDataGridColumn Property="ProductGroupName"
+                                      Title="Group"
+                                      Width="140px" />
+
+                <RadzenDataGridColumn Property="UnitName"
+                                      Title="Unit"
+                                      Width="80px"
+                                      TextAlign="TextAlign.Center" />
+
+                <RadzenDataGridColumn Property="SalePrice"
+                                      Title="Sale Price"
+                                      Width="100px"
+                                      TextAlign="TextAlign.Right" />
+
+                <RadzenDataGridColumn Property="GstPercent"
+                                      Title="GST %"
+                                      Width="80px"
+                                      TextAlign="TextAlign.Right" />
+
+            </Columns>
+
+        </RadzenDataGrid>
+
+    </RadzenCard>
+</div>
+
+@code {
+
+    List<ProductDto> products = new();
+    ElementReference gridContainer;
+
+    RadzenDataGrid<ProductDto> grid;
+
+    IList<ProductDto> selectedProducts = new List<ProductDto>();
+    ProductDto? SelectedProduct => selectedProducts.FirstOrDefault();
+
+    int selectedIndex = -1;
+    bool dataLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadAndInitializeAsync();
+            }
+        });
+    }
+    async Task LoadAndInitializeAsync()
+    {
+        dataLoaded = true;
+
+        await LoadProducts();
+
+        InitializeSelection();
+
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+    void InitializeSelection()
+    {
+        selectedProducts.Clear();
+
+        if (products.Count > 0)
+        {
+            selectedIndex = 0;
+            selectedProducts.Clear();
+            selectedProducts.Add(products[0]);
+        }
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender &&
+            !dataLoaded &&
+            Auth.IsInitialized &&
+            Auth.CurrentUser != null)
+        {
+            await LoadAndInitializeAsync();
+        }
+    }
+
+    void OnSelectedProductsChanged(IList<ProductDto> productsSelected)
+    {
+        selectedProducts = productsSelected;
+
+        var view = grid.View.Cast<ProductDto>().ToList();
+        var product = SelectedProduct;
+
+        if (product != null)
+            selectedIndex = view.IndexOf(product);
+    }
+
+    async Task LoadProducts()
+    {
+        try
+        {
+            products = await ProductApi.GetProductsAsync();
+        }
+        catch (ApiException ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }        
+    }
+
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<ProductDto> args)
+    {
+        await EditProduct(args.Data);
+    }
+
+    async Task OnRowClick(DataGridRowMouseEventArgs<ProductDto> args)
+    {
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+
+    async Task AddProduct()
+    {
+        await DialogService.OpenAsync<ProductDialog>(
+            "Add Product",
+            null,
+            new DialogOptions { Width = "720px", CloseDialogOnEsc = true, Draggable = true, Resizable = false });
+
+        await LoadProducts();
+    }
+
+    async Task EditProduct(ProductDto product)
+    {
+        await DialogService.OpenAsync<ProductDialog>(
+            "Edit Product",
+            new Dictionary<string, object> { { "ProductId", product.ProductId } },
+            new DialogOptions { Width = "720px", CloseDialogOnEsc = true, Draggable = true, Resizable = false });
+
+        await LoadProducts();
+    }
+
+    async Task HandleGridKeys(KeyboardEventArgs e)
+    {
+        var view = grid.View.Cast<ProductDto>().ToList();
+        if (view.Count == 0)
+            return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                selectedIndex++;
+                if (selectedIndex >= view.Count)
+                    selectedIndex = 0;
+                SelectRowByIndex();
+                break;
+
+            case "ArrowUp":
+                selectedIndex--;
+                if (selectedIndex < 0)
+                    selectedIndex = view.Count - 1;
+                SelectRowByIndex();
+                break;
+
+            case "Enter":
+                if (SelectedProduct != null)
+                    await EditProduct(SelectedProduct);
+                break;
+        }
+    }
+
+    void SelectRowByIndex()
+    {
+        var view = grid.View.Cast<ProductDto>().ToList();
+
+        if (view.Count == 0)
+            return;
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        if (selectedIndex >= view.Count)
+            selectedIndex = view.Count - 1;
+
+        selectedProducts.Clear();
+        selectedProducts.Add(view[selectedIndex]);
+    }
+}

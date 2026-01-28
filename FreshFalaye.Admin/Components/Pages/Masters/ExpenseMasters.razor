@@ -1,0 +1,247 @@
+﻿@page "/masters/expenses"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject ExpenseMasterApiService ExpenseApi
+@inject DialogService DialogService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+<div tabindex="0"
+     style="outline:none;height:100%"
+     @ref="gridContainer"
+     @onkeydown="HandleGridKeys"
+     @onkeydown:preventDefault="true">
+
+    <RadzenCard>
+
+        <div class="d-flex mb-1">
+            <b class="me-auto">Expense Master</b>
+
+            <RadzenButton Text="Add (Alt+A)"
+                          Icon="add"
+                          ButtonType="ButtonType.Button"
+                          AccessKey="A"
+                          Size="ButtonSize.Small"
+                          Click="@AddExpense" />
+        </div>
+
+        <RadzenDataGrid Data="@expenses"
+                        TItem="ExpenseMasterDto"
+                        @ref="grid"
+                        AllowPaging="true"
+                        PageSize="15"
+                        AllowRowSelectOnRowClick="true"
+                        SelectionMode="DataGridSelectionMode.Single"
+                        Value="@selectedExpenses"
+                        ValueChanged="@OnSelectedExpensesChanged"
+                        RowDoubleClick="@OnRowDoubleClick"
+                        RowClick="@OnRowClick"
+                        Style="height:70vh">
+
+            <Columns>
+
+                <RadzenDataGridColumn Property="ExpenseName"
+                                      Title="Expense Name" />
+
+                <RadzenDataGridColumn Property="ExpenseType"
+                                      Title="Type"
+                                      Width="90px"
+                                      TextAlign="TextAlign.Center" />
+
+                <RadzenDataGridColumn Property="RateType"
+                                      Title="Rate"
+                                      Width="60px"
+                                      TextAlign="TextAlign.Center" />
+
+                <RadzenDataGridColumn Property="Rate"
+                                      Title="Value"
+                                      Width="80px"
+                                      TextAlign="TextAlign.Right" />
+
+                <RadzenDataGridColumn Property="Bearer"
+                                      Title="Bearer"
+                                      Width="90px"
+                                      TextAlign="TextAlign.Center" />
+
+            </Columns>
+
+        </RadzenDataGrid>
+
+    </RadzenCard>
+</div>
+
+@code {
+
+    List<ExpenseMasterDto> expenses = new();
+    ElementReference gridContainer;
+
+    RadzenDataGrid<ExpenseMasterDto> grid;
+
+    IList<ExpenseMasterDto> selectedExpenses = new List<ExpenseMasterDto>();
+    ExpenseMasterDto? SelectedExpense => selectedExpenses.FirstOrDefault();
+
+    int selectedIndex = -1;
+    bool dataLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;        
+    }
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadAndInitializeAsync();
+            }
+        });
+    }
+    async Task LoadAndInitializeAsync()
+    {
+        dataLoaded = true;
+
+        await LoadExpenses();
+
+        InitializeSelection();
+
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+    void InitializeSelection()
+    {
+        selectedExpenses.Clear();
+
+        if (expenses.Count > 0)
+        {
+            selectedIndex = 0;
+            selectedExpenses.Clear();
+            selectedExpenses.Add(expenses[0]);
+        }
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender &&
+            !dataLoaded &&
+            Auth.IsInitialized &&
+            Auth.CurrentUser != null)
+        {
+            await LoadAndInitializeAsync();
+        }
+    }
+
+    void OnSelectedExpensesChanged(IList<ExpenseMasterDto> expensesSelected)
+    {
+        selectedExpenses = expensesSelected;
+
+        var view = grid.View.Cast<ExpenseMasterDto>().ToList();
+        var expense = SelectedExpense;
+
+        if (expense != null)
+            selectedIndex = view.IndexOf(expense);
+    }
+
+    async Task LoadExpenses()
+    {
+        expenses = await ExpenseApi.GetAllAsync();
+    }
+
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<ExpenseMasterDto> args)
+    {
+        await EditExpense(args.Data);
+    }
+
+    async Task OnRowClick(DataGridRowMouseEventArgs<ExpenseMasterDto> args)
+    {
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+
+    async Task AddExpense()
+    {
+        await DialogService.OpenAsync<ExpenseMasterDialog>(
+            "Add Expense",
+            null,
+            new DialogOptions
+            {
+                Width = "720px",
+                CloseDialogOnEsc = true,
+                Draggable = true,
+                Resizable = false
+            });
+
+        await LoadExpenses();
+    }
+
+    async Task EditExpense(ExpenseMasterDto expense)
+    {
+        await DialogService.OpenAsync<ExpenseMasterDialog>(
+            "Edit Expense",
+            new Dictionary<string, object> { { "Id", expense.Id } },
+            new DialogOptions
+            {
+                Width = "720px",
+                CloseDialogOnEsc = true,
+                Draggable = true,
+                Resizable = false
+            });
+
+        await LoadExpenses();
+    }
+
+    async Task HandleGridKeys(KeyboardEventArgs e)
+    {
+        var view = grid.View.Cast<ExpenseMasterDto>().ToList();
+        if (view.Count == 0)
+            return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                selectedIndex++;
+                if (selectedIndex >= view.Count)
+                    selectedIndex = 0;
+                SelectRowByIndex();
+                break;
+
+            case "ArrowUp":
+                selectedIndex--;
+                if (selectedIndex < 0)
+                    selectedIndex = view.Count - 1;
+                SelectRowByIndex();
+                break;
+
+            case "Enter":
+                if (SelectedExpense != null)
+                    await EditExpense(SelectedExpense);
+                break;
+        }
+    }
+
+    void SelectRowByIndex()
+    {
+        var view = grid.View.Cast<ExpenseMasterDto>().ToList();
+
+        if (view.Count == 0)
+            return;
+
+        if (selectedIndex < 0)
+            selectedIndex = 0;
+
+        if (selectedIndex >= view.Count)
+            selectedIndex = view.Count - 1;
+
+        selectedExpenses.Clear();
+        selectedExpenses.Add(view[selectedIndex]);
+    }
+}

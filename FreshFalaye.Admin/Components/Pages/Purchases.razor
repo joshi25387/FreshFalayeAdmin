@@ -1,0 +1,232 @@
+﻿@page "/stock/purchase"
+@layout MainLayout
+@rendermode InteractiveServer
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject PurchaseApiService PurchaseApi
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+<div tabindex="0"
+     style="outline:none;height:100%"
+     @ref="gridContainer"
+     @onkeydown="HandleGridKeys"
+     @onkeydown:preventDefault="true">
+
+    <RadzenCard>
+
+        <div class="d-flex mb-1">
+            <b class="me-auto">Purchase Register</b>
+
+            <RadzenButton Text="Add (Alt+A)"
+                          Icon="add"
+                          AccessKey="A"
+                          Size="ButtonSize.Small"
+                          Click="@AddPurchase" />
+        </div>
+
+        <RadzenDataGrid Data="@purchases"
+                        TItem="PurchaseListDto"
+                        @ref="grid"
+                        AllowPaging="true"
+                        PageSize="15"
+                        AllowRowSelectOnRowClick="true"
+                        SelectionMode="DataGridSelectionMode.Single"
+                        Value="@selected"
+                        ValueChanged="@OnSelectedChanged"
+                        RowDoubleClick="@OnRowDoubleClick"
+                        RowClick="@OnRowClick"
+                        Style="height:70vh">
+
+            <Columns>
+
+                <RadzenDataGridColumn Property="InvoiceNo"
+                                      Title="Invoice No"
+                                      Width="120px" />
+
+                <RadzenDataGridColumn Property="PurchaseDate"
+                                      Title="Date"
+                                      Width="110px"
+                                      FormatString="{0:dd-MM-yyyy}" />
+
+                <RadzenDataGridColumn Property="PartyName"
+                                      Title="Supplier" />
+
+                <RadzenDataGridColumn Property="ItemTotal"
+                                      Title="Item Total"
+                                      Width="110px"
+                                      TextAlign="TextAlign.Right" />
+
+                <RadzenDataGridColumn Property="ExpenseTotal"
+                                      Title="Expenses"
+                                      Width="110px"
+                                      TextAlign="TextAlign.Right" />
+
+                <RadzenDataGridColumn Property="NetAmount"
+                                      Title="Net Amount"
+                                      Width="120px"
+                                      TextAlign="TextAlign.Right" />
+
+            </Columns>
+
+        </RadzenDataGrid>
+
+    </RadzenCard>
+</div>
+
+
+@code {
+    List<PurchaseListDto> purchases = new();
+    IList<PurchaseListDto> selected = new List<PurchaseListDto>();
+
+    PurchaseListDto? SelectedPurchase => selected.FirstOrDefault();
+
+    RadzenDataGrid<PurchaseListDto> grid;
+    ElementReference gridContainer;
+
+    int selectedIndex = -1;
+    bool dataLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadAndInitializeAsync();
+            }
+        });
+    }
+    async Task LoadAndInitializeAsync()
+    {
+        dataLoaded = true;
+
+        await LoadPurchases();
+
+        InitializeSelection();
+
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+    void InitializeSelection()
+    {
+        selected.Clear();
+
+        if (purchases.Count > 0)
+        {
+            selectedIndex = 0;
+            selected.Clear();
+            selected.Add(purchases[0]);
+        }
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender &&
+            !dataLoaded &&
+            Auth.IsInitialized &&
+            Auth.CurrentUser != null)
+        {
+            await LoadAndInitializeAsync();
+        }
+    }
+    async Task LoadPurchases()
+    {
+        try
+        {
+            purchases = await PurchaseApi.GetListAsync();
+        }
+        catch (ApiException ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    async Task AddPurchase()
+    {
+        await DialogService.OpenAsync<PurchaseDialog>(
+            "New Purchase",
+            null,
+            new DialogOptions
+            {
+                Width = "1100px",
+                CloseDialogOnEsc = true,
+                Draggable = true
+            });
+
+        await LoadPurchases();
+    }
+
+    async Task EditPurchase(PurchaseListDto p)
+    {
+        await DialogService.OpenAsync<PurchaseDialog>(
+            "Edit Purchase",
+            new Dictionary<string, object> { { "PurchaseId", p.PurchaseId } },
+            new DialogOptions
+            {
+                Width = "1100px",
+                CloseDialogOnEsc = true,
+                Draggable = true
+            });
+
+        await LoadPurchases();
+    }
+
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<PurchaseListDto> args)
+        => await EditPurchase(args.Data);
+
+    async Task OnRowClick(DataGridRowMouseEventArgs<PurchaseListDto> args)
+        => await JS.InvokeVoidAsync("safeFocus", gridContainer);
+
+    void OnSelectedChanged(IList<PurchaseListDto> items)
+    {
+        selected = items;
+        var view = grid.View.Cast<PurchaseListDto>().ToList();
+        if (SelectedPurchase != null)
+            selectedIndex = view.IndexOf(SelectedPurchase);
+    }
+
+    async Task HandleGridKeys(KeyboardEventArgs e)
+    {
+        var view = grid.View.Cast<PurchaseListDto>().ToList();
+        if (!view.Any()) return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                selectedIndex = (selectedIndex + 1) % view.Count;
+                SelectRow(view);
+                break;
+
+            case "ArrowUp":
+                selectedIndex = selectedIndex <= 0 ? view.Count - 1 : selectedIndex - 1;
+                SelectRow(view);
+                break;
+
+            case "Enter":
+                if (SelectedPurchase != null)
+                    await EditPurchase(SelectedPurchase);
+                break;
+        }
+    }
+
+    void SelectRow(List<PurchaseListDto> view)
+    {
+        selected.Clear();
+        selected.Add(view[selectedIndex]);
+    }
+}
