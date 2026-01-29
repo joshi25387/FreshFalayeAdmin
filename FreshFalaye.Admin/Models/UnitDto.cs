@@ -2,7 +2,7 @@
 {
     public class UnitDto
     {
-        public int UnitId { get; set; }
+        public Guid UnitId { get; set; }
         public string UnitCode { get; set; } = "";
         public string UnitName { get; set; } = "";
         public bool DecimalAllowed { get; set; }

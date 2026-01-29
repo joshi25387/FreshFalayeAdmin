@@ -79,7 +79,7 @@
                            Style="width:100%"
                            Format="0.00" />
         </div>
-        <div class="col-12 mt-2">
+        <div class="col-6 mt-2">
             <RadzenLabel Text="Product Image" />
 
             <div class="d-flex align-items-center gap-3">
@@ -104,6 +104,10 @@
                     Save product first to enable image upload
                 </small>
             }
+        </div>
+        <div class="col-6">
+            <RadzenLabel Text="Use Weighing Scale" />
+            <RadzenCheckBox @bind-Value="model.UseWeighingScale"/>
         </div>
 
 
@@ -139,7 +143,7 @@
 
 @code {
 
-    [Parameter] public int? ProductId { get; set; }
+    [Parameter] public Guid? ProductId { get; set; }
 
     ProductDto model = new();
 
@@ -274,19 +278,19 @@
     {
         try
         {
-            model.BranchId = Auth.CurrentUser?.BranchId ?? 0;
+            model.BranchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
 
             if(string.IsNullOrWhiteSpace(model.ProductName))
             {
                 ShowError("Please enter Product Name");
                 return;
             }
-            else if (model.ProductGroupId<=0)
+            else if (model.ProductGroupId==Guid.Empty)
             {
                 ShowError("Please select Product Group");
                 return;
             }
-            else if (model.UnitId <= 0)
+            else if (model.UnitId == Guid.Empty)
             {
                 ShowError("Please select Unit");
                 return;

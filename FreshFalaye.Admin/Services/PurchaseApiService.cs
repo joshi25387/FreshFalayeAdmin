@@ -28,7 +28,7 @@ namespace FreshFalaye.Admin.Services
         // ===============================
         // GET PURCHASE BY ID (Future Edit)
         // ===============================
-        public async Task<PurchaseGetDto> GetAsync(int id)
+        public async Task<PurchaseGetDto> GetAsync(Guid id)
         {
             var response = await _http.GetAsync($"api/purchases/{id}");
             return await ReadResponse<PurchaseGetDto>(response);

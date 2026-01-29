@@ -2,9 +2,9 @@
 {
     public class ProductGroupDto
     {
-        public int ProductGroupId { get; set; }
-        public int BranchId { get; set; }
+        public Guid ProductGroupId { get; set; }
+        public Guid BranchId { get; set; }
         public string GroupName { get; set; } = null!;
-        public int? ParentGroupId { get; set; }
+        public Guid? ParentGroupId { get; set; }
     }
 }

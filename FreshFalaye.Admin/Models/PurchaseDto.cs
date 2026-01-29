@@ -2,8 +2,8 @@
 {
     public class PurchaseDto
     {
-        public int PurchaseId { get; set; }
-        public int BranchId { get; set; }
+        public Guid PurchaseId { get; set; }
+        public Guid BranchId { get; set; }
         public string BranchName { get; set; }
 
         public DateTime PurchaseDate { get; set; }
@@ -28,15 +28,15 @@
 
     public class PurchaseItemLineDto
     {
-        public int PurchaseItemId { get; set; }
+        public Guid PurchaseItemId { get; set; }
 
-        public int ProductGroupId { get; set; }
+        public Guid ProductGroupId { get; set; }
         public string ProductGroupName { get; set; } = null!;
 
-        public int ProductId { get; set; }
+        public Guid ProductId { get; set; }
         public string ProductName { get; set; } = null!;
 
-        public int UnitId { get; set; }
+        public Guid UnitId { get; set; }
         public string UnitName { get; set; } = null!;
 
         public decimal Qty { get; set; }
@@ -48,9 +48,9 @@
     }
     public class PurchaseExpenseLineDto
     {
-        public int PurchaseExpenseId { get; set; }
+        public Guid PurchaseExpenseId { get; set; }
 
-        public int ExpenseMasterId { get; set; }
+        public Guid ExpenseMasterId { get; set; }
         public string ExpenseName { get; set; } = null!;
 
         public string RateType { get; set; } = null!;

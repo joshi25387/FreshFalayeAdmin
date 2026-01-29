@@ -2,7 +2,7 @@
 {
     public class ExpenseMasterDto
     {
-        public int Id { get; set; }
+        public Guid Id { get; set; }
 
         public string ExpenseType { get; set; } = null!;   // Sale / Purchase
         public string ExpenseName { get; set; } = null!;

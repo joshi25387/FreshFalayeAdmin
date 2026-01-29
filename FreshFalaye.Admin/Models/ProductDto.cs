@@ -2,13 +2,13 @@
 {
     public class ProductDto
     {
-        public int BranchId { get; set; }
-        public int ProductId { get; set; }
+        public Guid BranchId { get; set; }
+        public Guid ProductId { get; set; }
 
-        public int ProductGroupId { get; set; }
+        public Guid ProductGroupId { get; set; }
         public string? ProductGroupName { get; set; }
 
-        public int UnitId { get; set; }
+        public Guid UnitId { get; set; }
         public string? UnitName { get; set; }
         public int MinimumStock { get; set; }
 
@@ -21,6 +21,7 @@
 
         public string? ImagePath { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool UseWeighingScale { get; set; } = true;
     }
 
 }

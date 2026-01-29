@@ -18,10 +18,10 @@ namespace FreshFalaye.Admin.Services
         public async Task<HttpResponseMessage> CreateAsync(ProductGroupDto dto)
             => await _http.PostAsJsonAsync("api/product-groups", dto);
 
-        public async Task<HttpResponseMessage> UpdateAsync(int id, ProductGroupDto dto)
+        public async Task<HttpResponseMessage> UpdateAsync(Guid id, ProductGroupDto dto)
             => await _http.PutAsJsonAsync($"api/product-groups/{id}", dto);
 
-        public async Task<HttpResponseMessage> DeleteAsync(int id)
+        public async Task<HttpResponseMessage> DeleteAsync(Guid id)
             => await _http.DeleteAsync($"api/product-groups/{id}");
     }
 

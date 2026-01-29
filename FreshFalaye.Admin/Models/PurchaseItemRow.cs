@@ -2,9 +2,9 @@
 {
     public class PurchaseItemRow
     {
-        public int ProductGroupId { get; set; }
-        public int ProductId { get; set; }
-        public int UnitId { get; set; }
+        public Guid ProductGroupId { get; set; }
+        public Guid ProductId { get; set; }
+        public Guid UnitId { get; set; }
         public string? UnitName { get; set; }
         public decimal Qty { get; set; }
         public decimal Rate { get; set; }

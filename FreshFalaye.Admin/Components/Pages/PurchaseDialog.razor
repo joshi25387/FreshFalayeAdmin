@@ -7,7 +7,7 @@
 @inject ProductGroupApiService ProductGroupApi
 @inject ProductApiService ProductApi
 @inject UnitApiService UnitApi
-@inject PartyApiService PartyApi
+@inject AccountApiService PartyApi
 @inject ExpenseMasterApiService ExpenseApi
 @inject DialogService DialogService
 @inject NotificationService NotificationService
@@ -30,11 +30,11 @@
         <div class="col-md-3">
             <label class="form-label">Supplier</label>
             <select class="form-select form-select-sm"
-                    @bind="header.PartyId">
+                    @bind="header.AccountId">
                 <option value="">-- select --</option>
                 @foreach (var p in parties)
                 {
-                    <option value="@p.PartyId">@p.PartyName</option>
+                    <option value="@p.Id">@p.AccountName</option>
                 }
             </select>
         </div>
@@ -248,7 +248,7 @@
 
 @code {
 
-    [Parameter] public int? PurchaseId { get; set; }
+    [Parameter] public Guid? PurchaseId { get; set; }
 
     PurchaseHeaderDto header = new()
     {
@@ -260,11 +260,11 @@
     List<PurchaseItemDto> items = new();
     List<PurchaseExpenseDto> expenses = new();
     DotNetObjectReference<PurchaseDialog>? objRef;
- 
+
     List<ProductGroupDto> productGroups = new();
     List<ProductDto> products = new();
     List<UnitDto> units = new();
-    List<PartyDto> parties = new();
+    List<AccountDto> parties = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -298,7 +298,13 @@
         productGroups = await ProductGroupApi.GetGroupsAsync();
         products = await ProductApi.GetProductsAsync();
         units = await UnitApi.GetUnitsAsync();
-        parties = await PartyApi.GetPartiesAsync();
+        parties = await PartyApi.GetAccountsAsync();
+
+        if(parties.Count > 0)
+        {
+            parties = parties.Where(p => p.AccountGroupName.ToUpper() == "VENDOR").ToList();
+        }
+
         expenses = await ExpenseApi.GetPurchaseExpensesAsync();
 
         if (PurchaseId.HasValue)
@@ -336,24 +342,24 @@
 
     void OnGroupChanged(ChangeEventArgs e, PurchaseItemDto row)
     {
-        if (int.TryParse(e.Value?.ToString(), out var groupId))
+        if (Guid.TryParse(e.Value?.ToString(), out var groupId))
         {
             row.ProductGroupId = groupId;
 
             // Reset product when group changes
-            row.ProductId = 0;
+            row.ProductId = Guid.Empty;
             row.Rate = 0;
             row.Amount = 0;
         }
     }
-    
+
     void OnUnitChanged(ChangeEventArgs e, PurchaseItemDto row)
     {
-        if (int.TryParse(e.Value?.ToString(), out var unitId))
+        if (Guid.TryParse(e.Value?.ToString(), out var unitId))
             row.UnitId = unitId;
     }
 
-   
+
 
     void OnExpenseRateChanged(ChangeEventArgs ev, PurchaseExpenseDto e)
     {
@@ -381,7 +387,7 @@
 
     void OnProductChanged(ChangeEventArgs e, PurchaseItemDto row)
     {
-        if (!int.TryParse(e.Value?.ToString(), out var productId))
+        if (!Guid.TryParse(e.Value?.ToString(), out var productId))
             return;
 
         row.ProductId = productId;
@@ -436,6 +442,11 @@
                 Items = items,
                 Expenses = expenses
             };
+
+            if(dto.Header.BranchId==Guid.Empty)
+            {
+                dto.Header.BranchId = Auth.CurrentUser.BranchId;    
+            }
 
             if (PurchaseId == null)
                 await PurchaseApi.CreateAsync(dto);

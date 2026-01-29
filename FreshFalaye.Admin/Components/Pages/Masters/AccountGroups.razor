@@ -1,0 +1,254 @@
+﻿@page "/masters/account-groups"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject AccountGroupApiService GroupApi
+@inject DialogService DialogService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+@implements IDisposable
+
+<AppInitializer Context="user">
+
+    <div tabindex="0"
+         style="outline:none;height:100%"
+         @ref="gridContainer"
+         @onkeydown="HandleGridKeys"
+         @onkeydown:preventDefault="true">
+
+        <RadzenCard>
+
+            <div class="d-flex mb-1">
+                <b class="me-auto">Account Groups</b>
+
+                <RadzenButton Text="Add (Alt+A)"
+                              Icon="add"
+                              ButtonType="ButtonType.Button"
+                              AccessKey="A"
+                              Size="ButtonSize.Small"
+                              Click="@AddGroup" />
+            </div>
+
+            <RadzenDataGrid Data="@groups"
+                            TItem="AccountGroupDto"
+                            @ref="grid"
+                            AllowPaging="true"
+                            PageSize="15"
+                            AllowRowSelectOnRowClick="true"
+                            SelectionMode="DataGridSelectionMode.Single"
+                            Value="@selectedGroups"
+                            ValueChanged="@OnSelectedGroupsChanged"
+                            RowClick="@OnRowClick"
+                            RowDoubleClick="@OnRowDoubleClick"
+                            Style="height:70vh">
+
+                <Columns>
+                    <RadzenDataGridColumn Property="GroupName"
+                                          Title="Group Name"
+                                          TextAlign="TextAlign.Left" />
+                </Columns>
+
+            </RadzenDataGrid>
+
+        </RadzenCard>
+    </div>
+
+</AppInitializer>
+
+@code {
+
+    List<AccountGroupDto> groups = new();
+
+    IList<AccountGroupDto> selectedGroups = new List<AccountGroupDto>();
+    AccountGroupDto? SelectedGroup => selectedGroups.FirstOrDefault();
+
+    int selectedIndex = 0;
+
+    RadzenDataGrid<AccountGroupDto>? grid;
+    ElementReference gridContainer;
+
+    bool dataLoaded;
+
+    /* -------------------- Lifecycle -------------------- */
+
+    protected override void OnInitialized()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadAndInitializeAsync();
+            }
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender &&
+            !dataLoaded &&
+            Auth.IsInitialized &&
+            Auth.CurrentUser != null)
+        {
+            await LoadAndInitializeAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+    }
+
+    /* -------------------- Data -------------------- */
+
+    async Task LoadAndInitializeAsync()
+    {
+        dataLoaded = true;
+
+        groups = await GroupApi.GetAccountGroupsAsync();
+
+        InitializeSelection();
+
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+
+    void InitializeSelection()
+    {
+        selectedGroups.Clear();
+
+        if (groups.Count > 0)
+        {
+            selectedIndex = 0;
+            selectedGroups.Add(groups[0]);
+            grid?.SelectRow(groups[0]);
+        }
+    }
+
+    /* -------------------- Grid Events -------------------- */
+
+    void OnSelectedGroupsChanged(IList<AccountGroupDto> selected)
+    {
+        selectedGroups.Clear();
+        foreach (var item in selected)
+            selectedGroups.Add(item);
+
+        var view = grid?.View?.Cast<AccountGroupDto>().ToList();
+        if (view == null) return;
+
+        var current = SelectedGroup;
+        if (current != null)
+            selectedIndex = view.IndexOf(current);
+    }
+
+    async Task OnRowClick(DataGridRowMouseEventArgs<AccountGroupDto> args)
+    {
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<AccountGroupDto> args)
+    {
+        await EditGroup(args.Data);
+    }
+
+    /* -------------------- Keyboard -------------------- */
+
+    async Task HandleGridKeys(KeyboardEventArgs e)
+    {
+        var view = grid?.View?.Cast<AccountGroupDto>().ToList();
+        if (view == null || view.Count == 0)
+            return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                selectedIndex = (selectedIndex + 1) % view.Count;
+                SelectRow(view);
+                break;
+
+            case "ArrowUp":
+                selectedIndex = (selectedIndex - 1 + view.Count) % view.Count;
+                SelectRow(view);
+                break;
+
+            case "Enter":
+                if (SelectedGroup != null)
+                    await EditGroup(SelectedGroup);
+                break;
+        }
+    }
+
+    void SelectRow(List<AccountGroupDto> view)
+    {
+        selectedIndex = Math.Clamp(selectedIndex, 0, view.Count - 1);
+
+        selectedGroups.Clear();
+        selectedGroups.Add(view[selectedIndex]);
+
+        grid?.SelectRow(view[selectedIndex]);
+    }
+
+    /* -------------------- Dialogs -------------------- */
+
+    async Task AddGroup()
+    {
+        try
+        {
+            await DialogService.OpenAsync<AccountGroupDialog>(
+           "Add Account Group",
+           null,
+           new DialogOptions
+           {
+               Width = "520px",
+               CloseDialogOnEsc = true,
+               Draggable = true,
+               Resizable = false
+           });
+
+            await ReloadAfterDialog();
+        }
+        catch (Exception ex)
+        {
+            
+            throw;
+        }
+       
+    }
+
+    async Task EditGroup(AccountGroupDto group)
+    {
+        await DialogService.OpenAsync<AccountGroupDialog>(
+            "Edit Account Group",
+            new Dictionary<string, object>
+            {
+                { "GroupId", group.Id }
+            },
+            new DialogOptions
+            {
+                Width = "520px",
+                CloseDialogOnEsc = true,
+                Draggable = true,
+                Resizable = false
+            });
+
+        await ReloadAfterDialog();
+    }
+
+    async Task ReloadAfterDialog()
+    {
+        groups = await GroupApi.GetAccountGroupsAsync();
+        InitializeSelection();
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+}

@@ -17,7 +17,7 @@ namespace FreshFalaye.Admin.Services
             return await _http.GetFromJsonAsync<List<UnitDto>>("api/units");
         }
 
-        public async Task<UnitDto> GetUnitAsync(int id)
+        public async Task<UnitDto> GetUnitAsync(Guid id)
         {
             return await _http.GetFromJsonAsync<UnitDto>($"api/units/{id}");
         }
@@ -27,12 +27,12 @@ namespace FreshFalaye.Admin.Services
             return await _http.PostAsJsonAsync("api/units", dto);            
         }
 
-        public async Task<HttpResponseMessage> UpdateUnitAsync(int id, UnitDto dto)
+        public async Task<HttpResponseMessage> UpdateUnitAsync(Guid id, UnitDto dto)
         {
             return await _http.PutAsJsonAsync($"api/units/{id}", dto);            
         }
 
-        public async Task<HttpResponseMessage> DeleteUnitAsync(int id)
+        public async Task<HttpResponseMessage> DeleteUnitAsync(Guid id)
         {
             return await _http.DeleteAsync($"api/units/{id}");            
         }

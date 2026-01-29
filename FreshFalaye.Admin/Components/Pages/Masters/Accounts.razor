@@ -1,11 +1,11 @@
-﻿@page "/masters/parties"
+﻿@page "/masters/accounts"
 @rendermode InteractiveServer
 @layout MainLayout
 
 @using FreshFalaye.Admin.Models
 @using FreshFalaye.Admin.Services
 
-@inject PartyApiService PartyApi
+@inject AccountApiService AccountApi
 @inject DialogService DialogService
 @inject IJSRuntime JS
 @inject AdminAuthService Auth
@@ -19,40 +19,40 @@
     <RadzenCard>
 
         <div class="d-flex mb-1">
-            <b class="me-auto">Party Master</b>
+            <b class="me-auto">Account Master</b>
 
             <RadzenButton Text="Add (Alt+A)"
                           Icon="add"
                           ButtonType="ButtonType.Button"
                           AccessKey="A"
                           Size="ButtonSize.Small"
-                          Click="@AddParty" />
+                          Click="@AddAccount" />
         </div>
 
-        <RadzenDataGrid Data="@parties"
-                        TItem="PartyDto"
+        <RadzenDataGrid Data="@accounts"
+                        TItem="AccountDto"
                         @ref="grid"
                         AllowPaging="true"
                         PageSize="15"
                         AllowRowSelectOnRowClick="true"
                         SelectionMode="DataGridSelectionMode.Single"
-                        Value="@selectedParties"
+                        Value="@selectedAccounts"
                         ValueChanged="@OnSelectedPartiesChanged"
                         RowDoubleClick="@OnRowDoubleClick"
                         RowClick="@OnRowClick"
                         Style="height:70vh">
 
             <Columns>
-                <RadzenDataGridColumn Property="PartyCode"
-                                      Title="Code"
+                <RadzenDataGridColumn Property="AccountCode"
+                                      Title="Account Code"
                                       Width="90px"
                                       TextAlign="TextAlign.Center" />
 
-                <RadzenDataGridColumn Property="PartyName"
-                                      Title="Party Name"
+                <RadzenDataGridColumn Property="AccountName"
+                                      Title="Account Name"
                                       TextAlign="TextAlign.Left" />
-                <RadzenDataGridColumn Property="PartyType"
-                                      Title="Party Type"
+                <RadzenDataGridColumn Property="AccountGroupName"
+                                      Title="Account Group"
                                       TextAlign="TextAlign.Left" />
 
                 <RadzenDataGridColumn Property="MobileNo"
@@ -73,13 +73,13 @@
 
 @code {
 
-    List<PartyDto> parties = new();
+    List<AccountDto> accounts = new();
 
     ElementReference gridContainer;
-    RadzenDataGrid<PartyDto> grid;
+    RadzenDataGrid<AccountDto> grid;
 
-    IList<PartyDto> selectedParties = new List<PartyDto>();
-    PartyDto? SelectedParty => selectedParties.FirstOrDefault();
+    IList<AccountDto> selectedAccounts = new List<AccountDto>();
+    AccountDto? SelectedAccount => selectedAccounts.FirstOrDefault();
 
     int selectedIndex = -1;
 
@@ -105,7 +105,7 @@
     {
         dataLoaded = true;
 
-        await LoadParties();
+        await LoadAccounts();
 
         InitializeSelection();
 
@@ -114,13 +114,13 @@
     }
     void InitializeSelection()
     {
-        selectedParties.Clear();
+        selectedAccounts.Clear();
 
-        if (parties.Count > 0)
+        if (accounts.Count > 0)
         {
             selectedIndex = 0;
-            selectedParties.Clear();
-            selectedParties.Add(parties[0]);
+            selectedAccounts.Clear();
+            selectedAccounts.Add(accounts[0]);
         }
     }
     public void Dispose()
@@ -139,36 +139,36 @@
         }
     }
 
-    async Task LoadParties()
+    async Task LoadAccounts()
     {
-        parties = await PartyApi.GetPartiesAsync();
+        accounts = await AccountApi.GetAccountsAsync();
     }
 
-    void OnSelectedPartiesChanged(IList<PartyDto> selected)
+    void OnSelectedPartiesChanged(IList<AccountDto> selected)
     {
-        selectedParties = selected;
+        selectedAccounts = selected;
 
-        var view = grid.View.Cast<PartyDto>().ToList();
-        var party = SelectedParty;
+        var view = grid.View.Cast<AccountDto>().ToList();
+        var party = SelectedAccount;
 
         if (party != null)
             selectedIndex = view.IndexOf(party);
     }
 
-    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<PartyDto> args)
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<AccountDto> args)
     {
         await EditParty(args.Data);
     }
 
-    async Task OnRowClick(DataGridRowMouseEventArgs<PartyDto> args)
+    async Task OnRowClick(DataGridRowMouseEventArgs<AccountDto> args)
     {
         await JS.InvokeVoidAsync("safeFocus", gridContainer);
     }
 
-    async Task AddParty()
+    async Task AddAccount()
     {
-        await DialogService.OpenAsync<PartyDialog>(
-            "Add Party",
+        await DialogService.OpenAsync<AccountDialog>(
+            "Add Account",
             null,
             new DialogOptions
             {
@@ -178,14 +178,14 @@
                 Resizable = false
             });
 
-        await LoadParties();
+        await LoadAccounts();
     }
 
-    async Task EditParty(PartyDto party)
+    async Task EditParty(AccountDto party)
     {
-        await DialogService.OpenAsync<PartyDialog>(
-            "Edit Party",
-            new Dictionary<string, object> { { "PartyId", party.PartyId } },
+        await DialogService.OpenAsync<AccountDialog>(
+            "Edit Account",
+            new Dictionary<string, object> { { "AccountId", party.Id } },
             new DialogOptions
             {
                 Width = "720px",
@@ -194,12 +194,12 @@
                 Resizable = false
             });
 
-        await LoadParties();
+        await LoadAccounts();
     }
 
     async Task HandleGridKeys(KeyboardEventArgs e)
     {
-        var view = grid.View.Cast<PartyDto>().ToList();
+        var view = grid.View.Cast<AccountDto>().ToList();
         if (view.Count == 0)
             return;
 
@@ -222,15 +222,15 @@
                 break;
 
             case "Enter":
-                if (SelectedParty != null)
-                    await EditParty(SelectedParty);
+                if (SelectedAccount != null)
+                    await EditParty(SelectedAccount);
                 break;
         }
     }
 
     void SelectRowByIndex()
     {
-        var view = grid.View.Cast<PartyDto>().ToList();
+        var view = grid.View.Cast<AccountDto>().ToList();
         if (view.Count == 0)
             return;
 
@@ -240,7 +240,7 @@
         if (selectedIndex >= view.Count)
             selectedIndex = view.Count - 1;
 
-        selectedParties.Clear();
-        selectedParties.Add(view[selectedIndex]);
+        selectedAccounts.Clear();
+        selectedAccounts.Add(view[selectedIndex]);
     }
 }

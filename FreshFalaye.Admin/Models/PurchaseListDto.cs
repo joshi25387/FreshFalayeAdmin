@@ -3,11 +3,11 @@
    
     public class PurchaseListDto
     {
-        public int PurchaseId { get; set; }
+        public Guid PurchaseId { get; set; }
 
         public DateTime PurchaseDate { get; set; }
 
-        public int BranchId { get; set; }
+        public Guid BranchId { get; set; }
         public string BranchName { get; set; } = null!;
 
         public int PartyId { get; set; }

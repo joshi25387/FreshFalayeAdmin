@@ -8,7 +8,7 @@
 @inject PurchaseApiService PurchaseApi
 @inject ProductApiService ProductApi
 @inject ProductGroupApiService ProductGroupApi
-@inject PartyApiService PartyApi
+@inject AccountApiService PartyApi
 @inject ExpenseMasterApiService ExpenseApi
 @inject NotificationService NotificationService
 
@@ -28,7 +28,7 @@
             <RadzenDropDown Data="@parties"
                             TextProperty="PartyName"
                             ValueProperty="PartyId"
-                            @bind-Value="header.PartyId"
+                            @bind-Value="header.AccountId"
                             Style="width:100%" />
         </div>
 
@@ -173,7 +173,7 @@
 
     PurchaseHeaderDto header = new() { PurchaseDate = DateTime.Today };
 
-    List<PartyDto> parties = new();
+    List<AccountDto> parties = new();
     List<ProductGroupDto> productGroups = new();
     List<ProductDto> products = new();
 
@@ -182,7 +182,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        parties = await PartyApi.GetPartiesAsync();
+        parties = await PartyApi.GetAccountsAsync();
         productGroups = await ProductGroupApi.GetGroupsAsync();
         products = await ProductApi.GetProductsAsync();
         expenses = (await ExpenseApi.GetPurchaseExpensesAsync()).Select(x => new PurchaseExpenseRow 
@@ -226,7 +226,7 @@
 
     async Task OnRowUpdate(PurchaseItemRow row)
     {
-        if (row.ProductId > 0 && row.Qty > 0)
+        if (row.ProductId != Guid.Empty && row.Qty > 0)
         {
             await EnsureLastRow();
         }
@@ -247,7 +247,7 @@
 
     async Task EnsureLastRow()
     {
-        if (items.Last().ProductId != 0)
+        if (items.Last().ProductId != Guid.Empty)
         {
             await AddNewRow();
         }
@@ -259,7 +259,7 @@
             .Where(p => p.ProductGroupId == row.ProductGroupId)
             .ToList();
 
-        row.ProductId = 0;
+        row.ProductId = Guid.Empty;
     }
 
     async Task OnProductChanged(PurchaseItemRow row)
@@ -279,7 +279,7 @@
         if (editingRow != null)
             await grid!.UpdateRow(editingRow);
 
-        if (!items.Any(x => x.ProductId > 0))
+        if (!items.Any(x => x.ProductId != Guid.Empty))
         {
             NotificationService.Notify(NotificationSeverity.Warning, "No Items", "Add at least one item");
             return;
@@ -288,7 +288,7 @@
         await PurchaseApi.CreateAsync(new PurchaseSaveDto
         {
             Header = header,
-            Items = items.Where(x => x.ProductId > 0 && x.Qty > 0).Select(x => new PurchaseItemDto
+            Items = items.Where(x => x.ProductId != Guid.Empty && x.Qty > 0).Select(x => new PurchaseItemDto
             {
                 ProductGroupId = x.ProductGroupId,
                 ProductId = x.ProductId,

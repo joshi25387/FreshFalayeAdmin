@@ -22,7 +22,7 @@ namespace FreshFalaye.Admin.Services
         {
             return await _http.PostAsJsonAsync("api/expense-master", dto);            
         }
-        public async Task<HttpResponseMessage> DeleteAsync(int id)
+        public async Task<HttpResponseMessage> DeleteAsync(Guid id)
         {
             return await _http.DeleteAsync($"api/expense-master/{id}");            
         }

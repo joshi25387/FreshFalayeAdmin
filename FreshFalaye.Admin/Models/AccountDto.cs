@@ -1,12 +1,13 @@
 ﻿namespace FreshFalaye.Admin.Models
 {
-    public class PartyDto
+    public class AccountDto
     {
-        public int PartyId { get; set; }
+        public Guid Id { get; set; }
 
-        public string PartyName { get; set; } = null!;
-        public string PartyCode { get; set; } = null!;
-        public string PartyType { get; set; } = "Both";
+        public string AccountName { get; set; } = null!;
+        public string AccountCode { get; set; } = null!;
+        public Guid AccountGroupId { get; set; }
+        public string AccountGroupName { get; set; }
 
         public string? Address { get; set; }
         public string? ContactNumber { get; set; }

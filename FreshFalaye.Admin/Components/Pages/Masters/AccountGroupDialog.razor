@@ -3,7 +3,7 @@
 @using FreshFalaye.Admin.Services
 @inherits BasePage
 
-@inject ProductGroupApiService GroupApi
+@inject AccountGroupApiService GroupApi
 @inject DialogService DialogService
 @inject IJSRuntime JS
 @inject AdminAuthService Auth
@@ -12,6 +12,7 @@
 @implements IDisposable
 
 <AppInitializer Context="user">
+    
 
     <RadzenCard Style="padding:10px">
 
@@ -28,10 +29,14 @@
                 <RadzenLabel Text="Parent Group" />
                 <RadzenDropDown Data="@allGroups"
                                 TextProperty="GroupName"
-                                ValueProperty="ProductGroupId"
+                                ValueProperty="Id"
                                 @bind-Value="model.ParentGroupId"
                                 AllowClear="true"
                                 Style="width:100%" />
+            </div>
+            <div class="col-12">
+                <RadzenCheckBox @bind-Value="model.IsPredefined" />
+                <RadzenLabel Text="Is Predefined" Style="margin-left:8px" />
             </div>
 
         </div>
@@ -74,11 +79,11 @@
 
     /* ---------------- State ---------------- */
 
-    ProductGroupDto model = new();
-    List<ProductGroupDto> allGroups = new();
+    AccountGroupDto model = new();
+    List<AccountGroupDto> allGroups = new();
 
     RadzenTextBox? nameBox;
-    DotNetObjectReference<ProductGroupDialog>? objRef;
+    DotNetObjectReference<AccountGroupDialog>? objRef;
 
     bool dataLoaded;
 
@@ -139,16 +144,16 @@
     {
         dataLoaded = true;
 
-        allGroups = await GroupApi.GetGroupsAsync();
+        allGroups = await GroupApi.GetAccountGroupsAsync();
 
         if (GroupId.HasValue)
         {
             model = allGroups
-                        .FirstOrDefault(g => g.ProductGroupId == GroupId.Value)
-                    ?? new ProductGroupDto();
+                        .FirstOrDefault(g => g.Id == GroupId.Value)
+                    ?? new AccountGroupDto();
 
             allGroups = allGroups
-                .Where(g => g.ProductGroupId != GroupId.Value)
+                .Where(g => g.Id != GroupId.Value)
                 .ToList();
         }
 
@@ -173,18 +178,18 @@
     {
         try
         {
-            model.BranchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+            //model.BranchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
             model.GroupName = model.GroupName?.Trim();
 
             if (string.IsNullOrWhiteSpace(model.GroupName))
             {
-                ShowError("Please enter Product Group");
+                ShowError("Please enter Account Group");
                 return;
             }
 
             var response = GroupId == null
                             ? await GroupApi.CreateAsync(model)
-                            : await GroupApi.UpdateAsync(model.ProductGroupId, model);
+                            : await GroupApi.UpdateAsync(model.Id, model);
 
             await HandleApiResponse(response);
 
@@ -198,7 +203,7 @@
         catch (HttpRequestException)
         {
             ShowError("Unable to connect to server");
-        }                       
+        }
     }
 
     async Task DeleteClick()
@@ -209,8 +214,8 @@
 
         if (confirm == true)
         {
-            var response = await GroupApi.DeleteAsync(model.ProductGroupId);
-            await HandleApiResponse(response);            
+            var response = await GroupApi.DeleteAsync(model.Id);
+            await HandleApiResponse(response);
             StateHasChanged();
             DialogService.Close();
         }
