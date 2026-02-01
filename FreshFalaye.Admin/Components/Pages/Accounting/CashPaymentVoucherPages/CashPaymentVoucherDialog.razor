@@ -1,0 +1,410 @@
+﻿@rendermode InteractiveServer
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject VoucherApiService VoucherApi
+@inherits BasePage
+@inject DialogService DialogService
+@inject AdminAuthService Auth
+@inject AccountApiService AccountApi
+@inject IJSRuntime JS
+@implements IDisposable
+
+<RadzenCard Style="padding:12px">
+
+    <!-- ================= HEADER ================= -->
+    <div class="row g-2">
+
+        <div class="col-md-3">
+            <label class="form-label">Voucher Date</label>
+            <input type="date"
+                   class="form-control form-control-sm"
+                   @bind="voucher.VoucherDate" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Account</label>
+            <select class="form-select form-select-sm"
+                    @bind="voucher.MainAccountId">
+                <option value="">-- select --</option>
+                @foreach (var p in cashAccounts)
+                {
+                    <option value="@p.Id">@p.AccountName</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <hr />
+
+    <!-- ================= ITEMS ================= -->
+    <div class="row">
+        <div class="col-md-10">
+            <b>Voucher Details</b>
+        </div>
+        <div class="col-md-2" style="text-align:right;">
+            <button class="btn btn-sm btn-secondary"
+                    @onclick="AddItem">
+                ➕ Add Item
+            </button>
+        </div>
+    </div>
+
+
+    <table class="table table-sm table-bordered mt-1">
+        <thead class="table-light">
+            <tr>
+                <th style="width:5%">#</th>
+                <th style="width:10%">D/C</th>
+                <th style="width:30%">Account</th>
+                <th style="width:10%">Amount</th>
+                <th style="width:10%">Mode</th>
+                <th style="width:10%" ">Ref No.</th>
+                <th style="width:20%">Remarks</th>
+                <th style="width:5%"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < voucher.VoucherDetails.Count; i++)
+
+            {
+                var index = i;
+                var row = voucher.VoucherDetails[i];
+                <tr>
+                    <td>@(i + 1)</td>
+
+                    <!-- Product Group -->
+                    <td>
+                        <!-- Product Group -->
+                        <select class="form-select form-select-sm"
+                                @bind="@row.DebitCredit">
+                            <option value="D" selected>Debit</option>
+                        </select>
+                    </td>
+
+                    <!-- Product -->
+                    <td>
+                        <!-- Product -->
+                        <select class="form-select form-select-sm"
+                                @bind="@row.DebitAccountId">
+                            <option value="">--</option>
+                            @foreach (var p in accounts)
+                            {
+                                <option value="@p.Id">@p.AccountName</option>
+                            }
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number"
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.Amount"
+                               @oninput="(e => OnAmountChanged(e, row))" />
+                    </td>
+                    <!-- Packing (Unit) -->
+                    <td>
+                        <select class="form-select form-select-sm"
+                                @bind="@row.BankVoucherModeId">
+                            <option value="">--</option>
+                            @foreach (var u in bankVoucherModes)
+                            {
+                                <option value="@u.Id">@u.Mode</option>
+                            }
+                        </select>
+                    </td>
+
+                    <!-- Qty -->
+                    <!-- Rate -->
+                    <td>
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               @bind="@row.RefNo" />
+                    </td>
+                    <td>
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               @bind="@row.Remarks" />
+                    </td>
+
+                    <!-- Delete -->
+                    <td class="text-center">
+                        @if (i > 0)
+                        {
+                            <button class="btn btn-sm btn-danger"
+                                    @onclick="() => RemoveItem(index)">
+                                ✖
+                            </button>
+                        }
+
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+
+
+    <hr />
+    <div class="row g-2">
+
+        <div class="col-md-3">
+            <label class="form-label">Narration</label>
+            <input type="text"
+                   class="form-control form-control-sm"
+                   @bind="voucher.Narration" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Total</label>
+            <input type="number" disabled
+                   class="form-control form-control-sm"
+                   @bind="@voucher.VoucherValue" />
+        </div>
+    </div>
+
+    <hr />
+
+    <div class="mt-3 d-flex">
+
+        @if (VoucherId != null)
+        {
+            <RadzenButton Text="Delete (Del)"
+                          Icon="delete"
+                          ButtonStyle="ButtonStyle.Danger"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@DeleteClick" />
+        }
+
+        <div class="ms-auto">
+            <RadzenButton Text="Save (Alt+S)"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@Save" />
+
+            <RadzenButton Text="Cancel (Esc)"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@Close"
+                          Style="margin-left:5px" />
+        </div>
+    </div>
+
+
+</RadzenCard>
+
+@code {
+
+    [Parameter] public Guid? VoucherId { get; set; }
+
+    VoucherDto voucher = new()
+    {
+        VoucherDate = DateTime.Today,
+        VoucherDetails = new()
+    };
+
+    bool dataLoaded;
+
+    List<AccountDto> accounts = new();
+    List<AccountDto> cashAccounts = new();
+    List<BankVoucherModeDto> bankVoucherModes = new();
+
+    DotNetObjectReference<CashPaymentVoucherDialog>? objRef;
+
+    List<VoucherTypeDto> voucherTypes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        voucherTypes = await VoucherApi.GetVoucherTypes();
+        accounts = await AccountApi.GetAccountsAsync();
+        bankVoucherModes = await VoucherApi.GetBankVoucherModes();
+        cashAccounts = accounts.Where(x => x.AccountGroupName == "Cash").ToList();
+
+        var _voucherTypeRecord = voucherTypes.Where(x => x.Type == "CashPayment").FirstOrDefault();
+
+        if (VoucherId.HasValue)
+        {
+            voucher = await VoucherApi.GetVoucherAsync(VoucherId.Value);
+
+        }
+        else
+        {
+            AddItem();
+        }
+        if (_voucherTypeRecord != null)
+        {
+            voucher.VoucherTypeId = _voucherTypeRecord.Id;
+            voucher.Series = _voucherTypeRecord.VoucherSeries;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        }
+    }
+
+    void AddItem()
+    {
+        voucher.VoucherDetails.Add(new VoucherDetailDto
+        {
+            DebitCredit = "D",
+        });
+    }
+    void OnAmountChanged(ChangeEventArgs e, VoucherDetailDto row)
+    {
+        row.Amount = Convert.ToDecimal(e.Value);
+        RecalculateTotal();
+    }
+    private void RecalculateTotal()
+    {
+        voucher.VoucherValue = voucher.VoucherDetails.Sum(x => x.Amount);
+        voucher.VoucherDebitValue = voucher.VoucherDetails.Where(x => x.DebitCredit == "D").Sum(x => x.Amount);
+        voucher.VoucherCreditValue = voucher.VoucherDetails.Where(x => x.DebitCredit == "C").Sum(x => x.Amount);
+    }
+
+    void RemoveItem(int index)
+    {
+        voucher.VoucherDetails.RemoveAt(index);
+        RecalculateTotal();
+    }
+
+
+    async Task Save()
+    {
+        try
+        {
+            if (voucher.BranchId == Guid.Empty)
+            {
+                voucher.BranchId = Auth.CurrentUser.BranchId;
+            }
+            if (voucher.MainAccountId == Guid.Empty)
+            {
+                ShowError("Please select Main Account");
+                return;
+            }
+
+            foreach (var row in voucher.VoucherDetails)
+            {
+                if (row.DebitAccountId == null || row.DebitAccountId == Guid.Empty)
+                {
+                    ShowError("Please select Account Id");
+                    return;
+                }
+                if (row.Amount == null || row.Amount <= 0)
+                {
+                    ShowError("Please enter Amount");
+                    return;
+                }
+                if (row.BankVoucherModeId == null || row.BankVoucherModeId == Guid.Empty)
+                {
+                    ShowError("Please select Mode");
+                    return;
+                }
+                row.CreditAccountId = voucher.MainAccountId;
+            }
+
+            var response = VoucherId == null
+                            ? await VoucherApi.CreateAsync(voucher)
+                            : await VoucherApi.UpdateAsync(voucher);
+
+
+            await HandleApiResponse(response);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // reload grid / close dialog / reset form
+                StateHasChanged();
+                DialogService.Close();
+            }
+        }
+        catch (ApiException ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    void ShowSuccess(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Success,
+            Summary = "Success",
+            Detail = message,
+            Duration = 2000
+        });
+    }
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+
+    async Task DeleteClick()
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete voucher?",
+            "Confirm Delete",
+            new ConfirmOptions
+            {
+                OkButtonText = "Yes",
+                CancelButtonText = "No"
+            });
+
+        if (confirm == true)
+        {
+            var response = await VoucherApi.DeleteAsync(voucher.Id);
+            await HandleApiResponse(response);
+            StateHasChanged();
+            DialogService.Close();
+        }
+    }
+
+    void Close() => DialogService.Close();
+}

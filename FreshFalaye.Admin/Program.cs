@@ -101,6 +101,7 @@ builder.Services.AddScoped<AccountApiService>();
 builder.Services.AddScoped<AccountGroupApiService>();
 builder.Services.AddScoped<ExpenseMasterApiService>();
 builder.Services.AddScoped<PurchaseApiService>();
+builder.Services.AddScoped<VoucherApiService>();
 builder.Services.AddScoped<IDashboardService, DashboardApiService>();
 
 

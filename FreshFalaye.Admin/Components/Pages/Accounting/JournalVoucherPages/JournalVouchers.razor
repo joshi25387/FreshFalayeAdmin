@@ -1,0 +1,233 @@
+﻿@page "/voucher/journal"
+@layout MainLayout
+@rendermode InteractiveServer
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject VoucherApiService VoucherApi
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+
+<div tabindex="0"
+     style="outline:none;height:100%"
+     @ref="gridContainer"
+     @onkeydown="HandleGridKeys"
+     @onkeydown:preventDefault="true">
+
+    <RadzenCard>
+
+        <div class="d-flex mb-1">
+            <b class="me-auto">Journal Vouchers</b>
+
+            <RadzenButton Text="Add (Alt+A)"
+                          Icon="add"
+                          AccessKey="A"
+                          Size="ButtonSize.Small"
+                          Click="@AddVoucher" />
+        </div>
+
+        <RadzenDataGrid Data="@vouchers"
+                        TItem="VoucherDto"
+                        @ref="grid"
+                        AllowPaging="true"
+                        PageSize="15"
+                        AllowRowSelectOnRowClick="true"
+                        SelectionMode="DataGridSelectionMode.Single"
+                        Value="@selected"
+                        ValueChanged="@OnSelectedChanged"
+                        RowDoubleClick="@OnRowDoubleClick"
+                        RowClick="@OnRowClick"
+                        Style="height:70vh">
+
+            <Columns>
+
+                <RadzenDataGridColumn Property="VoucherNumber"
+                                      Title="Voucher No"
+                                      Width="120px" />
+
+                <RadzenDataGridColumn Property="VoucherDate"
+                                      Title="Date"
+                                      Width="110px"
+                                      FormatString="{0:dd-MM-yyyy}" />
+
+                
+                <RadzenDataGridColumn Property="VoucherValue"
+                                      Title="Voucher Value"
+                                      Width="110px"
+                                      TextAlign="TextAlign.Right" />
+
+                <RadzenDataGridColumn Property="VoucherCreditValue"
+                                      Title="Credit Value"
+                                      Width="110px"
+                                      TextAlign="TextAlign.Right" />
+
+                <RadzenDataGridColumn Property="VoucherDebitValue"
+                                      Title="Debit Value"
+                                      Width="120px"
+                                      TextAlign="TextAlign.Right" />
+
+            </Columns>
+
+        </RadzenDataGrid>
+
+    </RadzenCard>
+</div>
+
+
+@code {
+    List<VoucherDto> vouchers = new();
+    IList<VoucherDto> selected = new List<VoucherDto>();
+
+
+
+    VoucherDto? SelectedVoucher => selected.FirstOrDefault();
+
+    RadzenDataGrid<VoucherDto> grid;
+    ElementReference gridContainer;
+
+    int selectedIndex = -1;
+    bool dataLoaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadAndInitializeAsync();
+            }
+        });
+    }
+    async Task LoadAndInitializeAsync()
+    {
+        dataLoaded = true;
+
+        await LoadVouchers();
+
+        InitializeSelection();
+
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+    void InitializeSelection()
+    {
+        selected.Clear();
+
+        if (vouchers.Count > 0)
+        {
+            selectedIndex = 0;
+            selected.Clear();
+            selected.Add(vouchers[0]);
+        }
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender &&
+            !dataLoaded &&
+            Auth.IsInitialized &&
+            Auth.CurrentUser != null)
+        {
+            await LoadAndInitializeAsync();
+        }
+    }
+    async Task LoadVouchers()
+    {
+        try
+        {
+            vouchers = await VoucherApi.GetVouchersAsync("Journal");
+        }
+        catch (ApiException ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    async Task AddVoucher()
+    {
+        await DialogService.OpenAsync<JournalVoucherDialog>(
+            "New Journal Voucher",
+            null,
+            new DialogOptions
+            {
+                Width = "1400px",
+                CloseDialogOnEsc = true,
+                Draggable = true
+            });
+
+        await LoadVouchers();
+    }
+
+    async Task EditVoucher(VoucherDto p)
+    {
+        await DialogService.OpenAsync<JournalVoucherDialog>(
+            "Edit Journal Voucher",
+            new Dictionary<string, object> { { "VoucherId", p.Id } },
+            new DialogOptions
+            {
+                Width = "1400px",
+                CloseDialogOnEsc = true,
+                Draggable = true
+            });
+
+        await LoadVouchers();
+    }
+
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<VoucherDto> args)
+        => await EditVoucher(args.Data);
+
+    async Task OnRowClick(DataGridRowMouseEventArgs<VoucherDto> args)
+        => await JS.InvokeVoidAsync("safeFocus", gridContainer);
+
+    void OnSelectedChanged(IList<VoucherDto> items)
+    {
+        selected = items;
+        var view = grid.View.Cast<VoucherDto>().ToList();
+        if (SelectedVoucher != null)
+            selectedIndex = view.IndexOf(SelectedVoucher);
+    }
+
+    async Task HandleGridKeys(KeyboardEventArgs e)
+    {
+        var view = grid.View.Cast<VoucherDto>().ToList();
+        if (!view.Any()) return;
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                selectedIndex = (selectedIndex + 1) % view.Count;
+                SelectRow(view);
+                break;
+
+            case "ArrowUp":
+                selectedIndex = selectedIndex <= 0 ? view.Count - 1 : selectedIndex - 1;
+                SelectRow(view);
+                break;
+
+            case "Enter":
+                if (SelectedVoucher != null)
+                    await EditVoucher(SelectedVoucher);
+                break;
+        }
+    }
+
+    void SelectRow(List<VoucherDto> view)
+    {
+        selected.Clear();
+        selected.Add(view[selectedIndex]);
+    }
+}
