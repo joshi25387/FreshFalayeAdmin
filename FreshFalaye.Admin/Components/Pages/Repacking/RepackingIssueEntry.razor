@@ -1,0 +1,467 @@
+﻿@page "/inventory/repacking-issues/new"
+@page "/inventory/repacking-issues/{Id:guid}"
+
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+
+@inject DialogService DialogService
+@inject AdminAuthService Auth
+@inject RepackingIssueApiService Api
+@inject StockApiService StockApi
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<RadzenCard Style="height:85vh;padding:10px;display:flex;flex-direction:column;">
+
+    <!-- ================= HEADER ================= -->
+
+    <div class="row mb-2">
+
+        <div class="col-2">
+            <RadzenLabel Text="Voucher No" />
+            <RadzenTextBox @bind-Value="model.VoucherNo" Disabled="true" Style="width:100%" />
+        </div>
+
+        <div class="col-2">
+            <RadzenLabel Text="Date" />
+            <RadzenDatePicker @bind-Value="model.IssueDate" Style="width:100%" />
+        </div>
+
+        <div class="col-4">
+            <RadzenLabel Text="Remarks" />
+            <RadzenTextBox @bind-Value="model.Remarks" Style="width:100%" />
+        </div>
+
+       
+    </div>
+
+
+    <!-- ================= SPLIT ================= -->
+
+    <div class="row flex-grow-1 overflow-hidden">
+
+        <!-- LEFT GRID (BATCH STOCK) -->
+
+        <div class="col-6 border-end">
+
+            <b>Available Stock</b>
+
+            <RadzenDataGrid Data="@availableLots" @ref="stockGrid"
+                            AllowFiltering="true"
+                            AllowColumnResize="true"
+                            FilterMode="FilterMode.Simple" PageSize="20" AllowPaging="true" AllowSorting="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            TItem="BranchBatchStockDto"
+                            AllowRowSelectOnRowClick="true"
+                            SelectionMode="DataGridSelectionMode.Single"
+                            RowDoubleClick="@AddLot"
+                            RowRender="@DisableSelectedRows"
+                            Style="height:100%">
+
+                <Columns>
+
+                    <RadzenDataGridColumn Property="ProductGroupName" Title="Item Group" />
+                    <RadzenDataGridColumn Property="ProductName" Title="Item" />
+                    <RadzenDataGridColumn Property="VendorName" Title="Vendor" />
+                    <RadzenDataGridColumn Property="PurchaseDate" Title="Date" Filterable="false" FormatString="{0:dd/MMM/yyyy}" />
+                    @* <RadzenDataGridColumn Property="LotNo" Title="Lot" Width="120px" /> *@
+                    @* <RadzenDataGridColumn Property="BalanceQty" Title="Balance" Width="100px" /> *@
+                    <RadzenDataGridColumn Title="Balance" Filterable="false">
+                        <Template Context="row">
+                            @GetRemainingQty(row.LotNo)
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn Property="Rate" Title="Rate" Filterable="false" Width="100px" />
+
+                </Columns>
+
+            </RadzenDataGrid>
+
+        </div>
+
+
+        <!-- RIGHT GRID (SELECTED) -->
+
+        <div class="col-6">
+
+            <b>Issue Items</b>
+
+            <RadzenDataGrid Data="@issueItems"
+                            TItem="IssueItemVm"
+                            Style="height:100%">
+
+                <Columns>
+
+                    <RadzenDataGridColumn Property="ProductGroupName" Title="Item Group" />
+                    <RadzenDataGridColumn Property="ProductName" Title="Item" />
+                    <RadzenDataGridColumn Property="ProductUnitName" Title="Unit" />
+                    @* <RadzenDataGridColumn Property="LotNo" Title="Lot" Width="120px" /> *@
+
+                    <RadzenDataGridColumn Title="Qty" Width="120px">
+                        <Template Context="row">
+                           @*  <RadzenNumeric TValue="decimal"
+                                           @bind-Value="row.Qty"
+                                           Min="1"
+                                           Max="@row.BalanceQty"
+                                           Style="width:100%" /> *@
+
+
+                            <input type="number"                                   
+                                   class="form-control form-control-sm"   
+                                   min="1"
+                                   max="@row.BalanceQty"
+
+                                    value="@row.Qty"
+                                   @oninput="@(async e => await OnQtyChanged(e, row))" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn Title="Remaining" Width="100px">
+                        <Template Context="row">
+                            <b>@row.Remaining</b>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+
+                    <RadzenDataGridColumn Property="Rate" Title="Rate" Width="100px" />
+
+                    <RadzenDataGridColumn Title="">
+                        <Template Context="row">
+                            <RadzenButton Icon="delete"
+                                          ButtonStyle="ButtonStyle.Danger"
+                                          Size="ButtonSize.Small"
+                                          Click="@(()=>Remove(row))" />
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                </Columns>
+
+            </RadzenDataGrid>
+
+        </div>
+
+    </div>
+    <div class="border-top pt-2 mt-2 d-flex justify-content-end gap-2">
+
+        @if (Id.HasValue)
+        {
+            <RadzenButton Text="Delete (Del)"
+                          Icon="delete"
+                          ButtonStyle="ButtonStyle.Danger"
+                          Size="ButtonSize.Small"
+                          Click="@DeleteClick" />
+        }
+        <div class="ms-auto">
+            <RadzenButton Text="Save (Alt+S)"
+                          Icon="save"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small"
+                          Click="Save"
+                          Disabled="@isSaving"
+                          IsBusy="@isSaving"
+                          BusyText="Saving..." />
+
+            <RadzenButton Text="Cancel (Esc)"
+                          Icon="close"
+                          ButtonStyle="ButtonStyle.Light"
+                          Size="ButtonSize.Small"
+                          Click="@Close" />
+        </div>
+        
+
+    </div>
+
+</RadzenCard>
+<!-- ================= FOOTER ACTION BAR ================= -->
+
+
+
+
+@code {
+
+    [Parameter] public Guid? Id { get; set; }
+
+    RepackingIssueSaveDto model = new()
+    {
+        IssueDate = DateTime.Today
+    };
+
+    List<BranchBatchStockDto> availableLots = new();
+    List<IssueItemVm> issueItems = new();
+    bool dataLoaded;
+    bool isSaving = false;
+    DotNetObjectReference<RepackingIssueEntry>? objRef;
+
+    RadzenDataGrid<BranchBatchStockDto> stockGrid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;               
+    }
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;        
+    }
+    void DisableSelectedRows(RowRenderEventArgs<BranchBatchStockDto> args)
+    {
+        if (issueItems.Any(x => x.LotNo == args.Data.LotNo))
+        {
+            args.Attributes["style"] =
+                "background:#f3f3f3; pointer-events:none; opacity:0.6;";
+        }
+        else
+        {
+            args.Attributes["style"] = "cursor:pointer";
+        }
+    }
+
+
+    async Task LoadDataAsync()
+    {        
+        var _branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+        availableLots = await StockApi.GetBatchStockAsync(_branchId);
+
+        if (Id.HasValue)
+        {
+            model = await Api.GetAsync(Id.Value);           
+
+            issueItems = model.Items.Select(x => new IssueItemVm
+            {
+                ProductId = x.ProductId,
+                ProductName = x.ProductName,
+                ProductGroupName = x.ProductGroupName,
+                ProductUnitName = x.ProductUnitName,
+                LotNo = x.LotNo,
+                Qty = x.Qty,
+                Rate = x.Rate,
+                BalanceQty = x.BalanceQty
+            }).ToList();
+
+            foreach (var item in issueItems)
+            {
+                var lot = availableLots.FirstOrDefault(x => x.LotNo == item.LotNo);
+                if (lot != null)
+                {
+                    lot.BalanceQty += item.Qty;   // ⭐ add back old qty
+                    item.BalanceQty = lot.BalanceQty;
+                }
+            }
+
+        }
+        dataLoaded = true;
+        await InvokeAsync(StateHasChanged);
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {        
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        }
+    }
+
+
+    void AddLot(DataGridRowMouseEventArgs<BranchBatchStockDto> args)
+    {
+        var lot = args.Data;
+
+        if (issueItems.Any(x => x.LotNo == lot.LotNo))
+            return;
+
+        issueItems = issueItems
+            .Append(new IssueItemVm
+            {
+                ProductId = lot.ProductId,
+                ProductName = lot.ProductName,
+                ProductGroupName = lot.ProductGroupName,
+                ProductUnitName = lot.UnitName,
+                LotNo = lot.LotNo,
+                Qty = 1,
+                Rate = lot.Rate,
+                BalanceQty = lot.BalanceQty
+            })
+            .ToList();
+    }
+
+
+
+    // void ValidateQty(RepackingIssueItemDto row, decimal newValue)
+    // {
+    //     if (newValue > row.BalanceQty)
+    //         row.Qty = row.BalanceQty;
+    //     else if (newValue <= 0)
+    //         row.Qty = 1;
+    //     else
+    //         row.Qty = newValue;
+
+    //     StateHasChanged();
+    // }
+
+
+    void Remove(IssueItemVm row)
+    {
+        issueItems = issueItems
+        .Where(x => x.LotNo != row.LotNo)
+        .ToList();
+    }
+
+
+    async Task OnQtyChanged(ChangeEventArgs e, IssueItemVm row)
+    {
+        if (!decimal.TryParse(e.Value?.ToString(), out var val))
+            val = 0;
+
+        val = Math.Clamp(val, 0, row.BalanceQty);
+
+        row.Qty = val;
+
+        
+        //row.Remaining = row.BalanceQty - row.Qty;
+        await stockGrid.Reload();        
+    }
+
+
+    decimal GetRemainingQty(Guid lotNo)
+    {
+        var lot = availableLots.First(x => x.LotNo == lotNo);
+
+        var issued = issueItems
+            .Where(x => x.LotNo == lotNo)
+            .Sum(x => x.Qty);
+
+        return lot.BalanceQty - issued;        
+    }
+
+    async Task Save()
+    {
+
+        if (isSaving) return;
+
+        isSaving = true;
+        try
+        {
+
+            if (issueItems.Count == 0)
+            {                
+                ShowError("No data found for repacking, please add data first");
+                return;
+            }
+            foreach (var _row in issueItems)
+            {
+                if (_row.Qty < 1)
+                {
+                    ShowError("Qty can not be less than 1");
+                    return;
+                }
+                else if (_row.Qty > _row.BalanceQty)
+                {
+                    ShowError("Qty can not be greater than Balance Qty");
+                    return;
+                }
+            }
+
+            model.BranchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+            model.Items = issueItems.Select(x => new RepackingIssueItemDto
+            {
+                ProductId = x.ProductId,
+                LotNo = x.LotNo,
+                Qty = x.Qty,
+                Rate = x.Rate
+            }).ToList();
+
+            var response = Id == null
+                                ? await Api.CreateAsync(model)
+                                : await Api.UpdateAsync(Id.Value, model);
+
+            await HandleApiResponse(response);
+
+
+            Nav.NavigateTo("/inventory/repacking-issues");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+
+
+    }
+
+    async Task DeleteClick()
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete voucher '{model.VoucherNo}'?",
+            "Confirm Delete");
+
+        if (confirm == true)
+        {
+            var response = await Api.DeleteAsync(Id.Value);
+            await HandleApiResponse(response);
+            StateHasChanged();
+            DialogService.Close();
+            Nav.NavigateTo("/inventory/repacking-issues");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnAltS() => await Save();
+
+    [JSInvokable]
+    public Task OnEsc()
+    {
+        Close();
+        return Task.CompletedTask;
+    }
+    void Close()
+    {
+        Nav.NavigateTo("/inventory/repacking-issues");
+    }
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+
+    class IssueItemVm
+    {
+        public Guid ProductId { get; set; }
+        public string ProductName { get; set; }
+        public string ProductGroupName { get; set; }
+        public string ProductUnitName { get; set; }
+        public Guid LotNo { get; set; }
+        public decimal BalanceQty { get; set; }
+        public decimal Qty { get; set; }
+        public decimal Rate { get; set; }
+        public decimal Remaining => BalanceQty - Qty;
+    }
+}

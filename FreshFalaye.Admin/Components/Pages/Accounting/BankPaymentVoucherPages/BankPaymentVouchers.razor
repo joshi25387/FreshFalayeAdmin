@@ -32,9 +32,14 @@
 
         <RadzenDataGrid Data="@vouchers"
                         TItem="VoucherDto"
+                        AllowFiltering="true"
+                        FilterMode="FilterMode.Simple"
+                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                         @ref="grid"
                         AllowPaging="true"
                         PageSize="15"
+                        AllowRowExpand="true"
+                        ExpandMode="DataGridExpandMode.Multiple"
                         AllowRowSelectOnRowClick="true"
                         SelectionMode="DataGridSelectionMode.Single"
                         Value="@selected"
@@ -43,38 +48,81 @@
                         RowClick="@OnRowClick"
                         Style="height:70vh">
 
+            <!-- ================= MASTER GRID ================= -->
             <Columns>
-
-                <RadzenDataGridColumn Property="VoucherNumber"
-                                      Title="Voucher No"
-                                      Width="120px" />
 
                 <RadzenDataGridColumn Property="VoucherDate"
                                       Title="Date"
                                       Width="110px"
                                       FormatString="{0:dd-MM-yyyy}" />
 
+                <RadzenDataGridColumn Property="VoucherNoString"
+                                      Title="Voucher No"
+                                      Width="130px" />
+
                 <RadzenDataGridColumn Property="MainAccountName"
-                                      Title="Main Account Name" />
+                                      Title="A/C. Head" />
 
-                <RadzenDataGridColumn Property="VoucherValue"
+                <RadzenDataGridColumn Property="VoucherValue" Filterable="false"
                                       Title="Voucher Value"
-                                      Width="110px"
-                                      TextAlign="TextAlign.Right" />
-
-                <RadzenDataGridColumn Property="VoucherCreditValue"
-                                      Title="Credit Value"
-                                      Width="110px"
-                                      TextAlign="TextAlign.Right" />
-
-                <RadzenDataGridColumn Property="VoucherDebitValue"
-                                      Title="Debit Value"
                                       Width="120px"
-                                      TextAlign="TextAlign.Right" />
+                                      TextAlign="TextAlign.Right"
+                                      FormatString="{0:N2}" />
 
             </Columns>
 
+
+            <!-- ================= CHILD ROW TEMPLATE (OLD RADZEN SYNTAX) ================= -->
+            <Template Context="voucher">
+
+                @if (voucher.VoucherDetails != null && voucher.VoucherDetails.Any())
+                {
+                    <div style="padding:8px 0 8px 40px;background:#fafafa">
+
+                        <RadzenDataGrid Data="@voucher.VoucherDetails"
+                                        AllowFiltering="true"
+                                        FilterMode="FilterMode.Simple"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        TItem="VoucherDetailDto"
+                                        AllowPaging="false"
+                                        Density="Density.Compact">
+
+                            <Columns>
+
+                                <!-- Account -->
+                                <RadzenDataGridColumn Property="AccountName" Title="Account Description" />                                                                
+
+                                <!-- Debit -->
+                                <RadzenDataGridColumn Title="Amount" Filterable="false"
+                                                      Width="120px"
+                                                      TextAlign="TextAlign.Right">
+                                    <Template Context="d">
+                                        @(d.DebitAccountId != null
+                                                                            ? d.Amount?.ToString("N2")
+                                                                            : "")
+                                                                             </Template>
+                                                                         </RadzenDataGridColumn>                                
+
+                                <!-- Ref -->
+                                <RadzenDataGridColumn Property="RefNo"
+                                                      Title="Ref No"
+                                                      Width="130px" />
+
+                                <!-- Remarks -->
+                                <RadzenDataGridColumn Property="Remarks"
+                                                      Title="Remarks" />
+
+                            </Columns>
+
+                        </RadzenDataGrid>
+
+                    </div>
+                                }
+
+            </Template>
+
         </RadzenDataGrid>
+
 
     </RadzenCard>
 </div>
@@ -93,6 +141,7 @@
 
     int selectedIndex = -1;
     bool dataLoaded;
+    bool expandAfterRender;
 
     protected override async Task OnInitializedAsync()
     {
@@ -117,6 +166,8 @@
         await LoadVouchers();
 
         InitializeSelection();
+
+        expandAfterRender = true;
 
         await InvokeAsync(StateHasChanged);
         await JS.InvokeVoidAsync("safeFocus", gridContainer);
@@ -146,6 +197,17 @@
         {
             await LoadAndInitializeAsync();
         }
+
+        // ⭐ expand AFTER grid is rendered
+        // if (expandAfterRender && grid != null)
+        // {
+        //     expandAfterRender = false;
+
+        //     foreach (var v in vouchers)
+        //     {
+        //         await grid.ExpandRow(v);
+        //     }
+        // }
     }
     async Task LoadVouchers()
     {

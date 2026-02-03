@@ -1,5 +1,6 @@
 ﻿
 using FreshFalaye.Admin.Models;
+using Newtonsoft.Json;
 using System.Net.Http.Json;
 
 namespace FreshFalaye.Admin.Services
@@ -36,6 +37,7 @@ namespace FreshFalaye.Admin.Services
 
         public async Task<HttpResponseMessage> UpdateAsync(Guid id, ProductDto dto)
         {
+            string json = JsonConvert.SerializeObject(dto);
             return await _http.PutAsJsonAsync($"api/products/{id}", dto);            
         }
 

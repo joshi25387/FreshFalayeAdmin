@@ -32,6 +32,100 @@
 
         <RadzenDataGrid Data="@vouchers"
                         TItem="VoucherDto"
+                        AllowFiltering="true"
+                        FilterMode="FilterMode.Simple"
+                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                        @ref="grid"
+                        AllowPaging="true"
+                        PageSize="15"
+                        AllowRowExpand="true"
+                        ExpandMode="DataGridExpandMode.Multiple"
+                        AllowRowSelectOnRowClick="true"
+                        SelectionMode="DataGridSelectionMode.Single"
+                        Value="@selected"
+                        ValueChanged="@OnSelectedChanged"
+                        RowDoubleClick="@OnRowDoubleClick"
+                        RowClick="@OnRowClick"
+                        Style="height:70vh">
+
+            <!-- ================= MASTER GRID ================= -->
+            <Columns>
+
+                <RadzenDataGridColumn Property="VoucherDate"
+                                      Title="Date"
+                                      Width="110px"
+                                      FormatString="{0:dd-MM-yyyy}" />
+
+                <RadzenDataGridColumn Property="VoucherNoString"
+                                      Title="Voucher No"
+                                      Width="130px" />
+
+               @*  <RadzenDataGridColumn Property="MainAccountName"
+                                      Title="A/C. Head" /> *@
+
+                <RadzenDataGridColumn Property="VoucherValue" Filterable="false"
+                                      Title="Voucher Value"
+                                      Width="120px"
+                                      TextAlign="TextAlign.Right"
+                                      FormatString="{0:N2}" />
+
+            </Columns>
+
+
+            <!-- ================= CHILD ROW TEMPLATE (OLD RADZEN SYNTAX) ================= -->
+            <Template Context="voucher">
+
+                @if (voucher.VoucherDetails != null && voucher.VoucherDetails.Any())
+                {
+                    <div style="padding:8px 0 8px 40px;background:#fafafa">
+
+                        <RadzenDataGrid Data="@voucher.VoucherDetails"
+                                        AllowFiltering="true"
+                                        FilterMode="FilterMode.Simple"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        TItem="VoucherDetailDto"
+                                        AllowPaging="false"
+                                        Density="Density.Compact">
+
+                            <Columns>
+
+                                <!-- Account -->
+                                <RadzenDataGridColumn Property="DebitAccountName" Title="Debit Account" />
+                                <RadzenDataGridColumn Property="CreditAccountName" Title="Credit Account" />
+
+                                <!-- Debit -->
+                                <RadzenDataGridColumn Title="Amount" Filterable="false"
+                                                      Width="120px"
+                                                      TextAlign="TextAlign.Right">
+                                    <Template Context="d">
+                                        @(d.DebitAccountId != null
+                                                                            ? d.Amount?.ToString("N2")
+                                                                            : "")
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                                <!-- Ref -->
+                                <RadzenDataGridColumn Property="RefNo"
+                                                      Title="Ref No"
+                                                      Width="130px" />
+
+                                <!-- Remarks -->
+                                <RadzenDataGridColumn Property="Remarks"
+                                                      Title="Remarks" />
+
+                            </Columns>
+
+                        </RadzenDataGrid>
+
+                    </div>
+                                }
+
+            </Template>
+
+        </RadzenDataGrid>
+
+        @* <RadzenDataGrid Data="@vouchers"
+                        TItem="VoucherDto"
                         @ref="grid"
                         AllowPaging="true"
                         PageSize="15"
@@ -72,7 +166,7 @@
 
             </Columns>
 
-        </RadzenDataGrid>
+        </RadzenDataGrid> *@
 
     </RadzenCard>
 </div>

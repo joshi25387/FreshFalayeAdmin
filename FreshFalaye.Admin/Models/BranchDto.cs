@@ -10,4 +10,21 @@
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
+
+    public class BranchBatchStockDto
+    {
+        public Guid ProductId { get; set; }
+
+        public string ProductName { get; set; } = string.Empty;
+        public string ProductGroupName { get; set; } = string.Empty;
+        public string UnitName { get; set; } = string.Empty;
+        public string VendorName { get; set; } = string.Empty;
+        public Guid LotNo { get; set; }
+
+        public decimal BalanceQty { get; set; }
+
+        public decimal Rate { get; set; }
+
+        public DateTime PurchaseDate { get; set; }
+    }
 }

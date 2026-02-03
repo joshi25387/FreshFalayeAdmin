@@ -211,6 +211,8 @@
             // Re-load product to get updated ImagePath
             model = await ProductApi.GetProductAsync(ProductId.Value);
             StateHasChanged();
+            ShowSuccess("Image uploaded successfully");
+            Close();
         }
     }
 
@@ -319,7 +321,7 @@
 
                 // reload product so ProductId is available for image upload
                 var latest = (await ProductApi.GetProductsAsync())
-                                .OrderByDescending(x => x.ProductId)
+                                .Where(x => x.ProductName == model.ProductName)
                                 .First();
 
                 ProductId = latest.ProductId;
@@ -418,6 +420,8 @@
             DialogService.Close();
         }
     }
+
+    
 
     void Close() => DialogService.Close();
 

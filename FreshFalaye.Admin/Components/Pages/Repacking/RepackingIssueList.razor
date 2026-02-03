@@ -1,0 +1,127 @@
+﻿@page "/inventory/repacking-issues"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inject RepackingIssueApiService Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+@implements IDisposable
+
+<div tabindex="0"
+     style="outline:none;height:100%"
+     @ref="gridContainer"
+     @onkeydown="HandleKeys"
+     @onkeydown:preventDefault="true">
+
+    <RadzenCard>
+
+        <div class="d-flex mb-1">
+            <b class="me-auto">Repacking Issue</b>
+
+            <RadzenButton Text="Add (Alt+A)"
+                          Icon="add"
+                          Size="ButtonSize.Small"
+                          Click="@AddNew" />
+        </div>
+
+        <RadzenDataGrid Data="@rows"
+                        TItem="RepackingIssueListDto"
+                        @ref="grid"
+                        AllowPaging="true"
+                        PageSize="15"
+                        RowDoubleClick="@OnRowDoubleClick"
+                        Style="height:70vh">
+
+            <Columns>
+
+                <RadzenDataGridColumn Property="VoucherNo" Title="Voucher" Width="120px" />
+                <RadzenDataGridColumn Property="IssueDate" Title="Date" Width="150px" FormatString="{0:dd-MM-yyyy}" />
+                <RadzenDataGridColumn Property="TotalQty" Title="Qty" Width="100px" />
+                <RadzenDataGridColumn Property="ItemCount" Title="Items" Width="100px" />
+                <RadzenDataGridColumn Property="Remarks" Title="Remarks" />
+
+            </Columns>
+        </RadzenDataGrid>
+
+    </RadzenCard>
+</div>
+
+
+@code {
+
+    List<RepackingIssueListDto> rows = new();
+
+    RadzenDataGrid<RepackingIssueListDto> grid;
+    ElementReference gridContainer;
+
+    bool dataLoaded;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    async Task LoadAndInitializeAsync()
+    {
+        dataLoaded = true;
+
+        var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+        rows = await Api.GetListAsync(branchId);
+
+      
+        await InvokeAsync(StateHasChanged);
+        await JS.InvokeVoidAsync("safeFocus", gridContainer);
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadAndInitializeAsync();
+            }
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender &&
+            !dataLoaded &&
+            Auth.IsInitialized &&
+            Auth.CurrentUser != null)
+        {
+            await LoadAndInitializeAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+    }
+
+
+    void AddNew()
+    {
+        Nav.NavigateTo("/inventory/repacking-issues/new");
+    }
+
+    void OnRowDoubleClick(DataGridRowMouseEventArgs<RepackingIssueListDto> args)
+    {
+        Nav.NavigateTo($"/inventory/repacking-issues/{args.Data.Id}");
+    }
+
+    void HandleKeys(KeyboardEventArgs e)
+    {
+        if (e.AltKey && e.Key == "a")
+            AddNew();
+    }
+}
