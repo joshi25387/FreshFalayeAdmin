@@ -103,6 +103,7 @@ builder.Services.AddScoped<ExpenseMasterApiService>();
 builder.Services.AddScoped<PurchaseApiService>();
 builder.Services.AddScoped<VoucherApiService>();
 builder.Services.AddScoped<RepackingIssueApiService>();
+builder.Services.AddScoped<RepackingReceiveApiService>();
 builder.Services.AddScoped<StockApiService>();
 builder.Services.AddScoped<IDashboardService, DashboardApiService>();
 

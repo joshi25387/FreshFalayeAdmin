@@ -1,0 +1,501 @@
+﻿@page "/inventory/repacking-receives/new"
+@page "/inventory/repacking-receives/{Id:guid}"
+
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Components.Pages.Shared.Dialogs
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@using System.Collections.ObjectModel
+@inherits BasePage
+
+
+@inject DialogService DialogService
+@inject AdminAuthService Auth
+@inject RepackingReceiveApiService Api
+@inject ProductApiService ProductApi
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IDisposable
+
+<RadzenCard Style="height:85vh;padding:10px;display:flex;flex-direction:column;">
+
+    <!-- ================= HEADER ================= -->
+
+    <div class="row mb-2">
+
+        <div class="col-2">
+            <RadzenLabel Text="Voucher No" />
+            <RadzenTextBox @bind-Value="model.VoucherNo" Disabled="true" Style="width:100%" />
+        </div>
+
+        <div class="col-2">
+            <RadzenLabel Text="Date" />
+            <RadzenDatePicker @bind-Value="model.ReceiveDate" Style="width:100%" />
+        </div>
+
+        <div class="col-4">
+            <RadzenLabel Text="Remarks" />
+            <RadzenTextBox @bind-Value="model.Remarks" Style="width:100%" />
+        </div>
+
+    </div>
+
+
+    <!-- ================= SOURCE INFO ================= -->
+    @if (selectedIssue != null)
+    {
+        <div class="alert alert-info py-1 mb-2">
+            <b>Using:</b>
+            @selectedIssue.ProductName |
+            Purchase Date: @selectedIssue.PurchaseDate.ToString("dd-MM-yyyy") |
+            Party: @selectedIssue.VendorName|
+            Pending Qty: @selectedIssue.PendingQty|
+            Used Qty: <b>@usedQty</b>
+        </div>
+    }
+
+
+    <!-- ================= SPLIT ================= -->
+
+    <div class="row flex-grow-1 overflow-hidden">
+
+        <!-- LEFT GRID (PENDING ISSUES) -->
+
+        <div class="col-9 border-end">
+
+            <b>Pending Issues</b>
+
+            <RadzenDataGrid Data="@pendingIssues"
+                            TItem="PendingIssueDto"
+                            AllowFiltering="true"
+                            AllowPaging="true"
+                            PageSize="20"
+                            RowDoubleClick="@SelectIssueRow"
+                            RowRender="@DisableAfterSelect"
+                            Style="height:100%">
+
+                <Columns>
+
+                    <RadzenDataGridColumn Property="VoucherNo" Title="Voucher" Width="100px" />
+                    <RadzenDataGridColumn Property="IssueDate" Title="Iss. Date" Width="120px" FormatString="{0:dd/MM/yyyy}" />
+                    <RadzenDataGridColumn Property="PurchaseDate" Title="Pur Date" Width="120px" FormatString="{0:dd/MM/yyyy}" />
+                    <RadzenDataGridColumn Property="ProductGroupName" Width="150px" Title="Item Grp" />
+                    <RadzenDataGridColumn Property="ProductName" Width="150px" Title="Item" />
+                    <RadzenDataGridColumn Property="VendorName" Width="150px" Title="Party" />
+                    <RadzenDataGridColumn Property="IssuedQty" Title="Iss. Qty" Width="120px" />
+                    <RadzenDataGridColumn Property="PendingQty" Title="Pndg Qty" Width="120px" />
+                    
+
+                </Columns>
+
+            </RadzenDataGrid>
+
+        </div>
+
+
+        <!-- RIGHT GRID (RECEIVE ITEMS) -->
+
+        <div class="col-3">            
+            <div class="d-flex mb-1">
+                <b class="me-auto">Receive Items</b>
+
+                <RadzenButton Text="Add"
+                              Icon="add"
+                              Size="ButtonSize.Small"
+                              Click="@AddRow"
+                              />
+            </div>
+            <div class="table-responsive" style="height:400px; overflow:auto;">
+
+                <table class="table table-sm table-bordered align-middle">
+
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:60%">Item</th>
+                            <th style="width:120px">Qty</th>                            
+                            <th style="width:60px"></th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach (var row in receiveItems)
+                        {
+                            <tr>
+
+                                <!-- Product -->
+                                <td>
+                                    <RadzenDropDown Data="@products"
+                                                    TextProperty="ProductName"
+                                                    ValueProperty="ProductId"
+                                                    TValue="Guid"
+                                                    @bind-Value="row.ProductId"
+                                                    Style="width:100%" />
+                                </td>
+
+                                <!-- Qty -->
+                                <td>
+                                    <input type="number"
+                                           class="form-control form-control-sm"
+                                           min="1"
+                                           @bind="row.Qty" />
+                                </td>
+                              
+                                <!-- Delete -->
+                                <td class="text-center">
+                                    <RadzenButton Icon="delete"
+                                                  Size="ButtonSize.Small"
+                                                  ButtonStyle="ButtonStyle.Danger"
+                                                  Click="@(()=>Remove(row))" />
+                                </td>
+
+                            </tr>
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+
+    <div class="border-top pt-2 mt-2 d-flex justify-content-end gap-2">
+
+        @if (Id.HasValue)
+        {
+            <RadzenButton Text="Delete (Del)"
+                          Icon="delete"
+                          ButtonStyle="ButtonStyle.Danger"
+                          Size="ButtonSize.Small"
+                          Click="@DeleteClick" />
+        }
+        <div class="ms-auto">
+            <RadzenButton Text="Save (Alt+S)"
+                          Icon="save"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small"
+                          Click="Save"
+                          Disabled="@isSaving"
+                          IsBusy="@isSaving"
+                          BusyText="Saving..." />
+
+            <RadzenButton Text="Cancel (Esc)"
+                          Icon="close"
+                          ButtonStyle="ButtonStyle.Light"
+                          Size="ButtonSize.Small"
+                          Click="@Close" />
+        </div>
+
+
+    </div>
+
+</RadzenCard>
+@code {
+
+    [Parameter] public Guid? Id { get; set; }
+
+    bool dataLoaded;
+    bool isSaving = false;
+    List<ProductDto> products = new();
+
+    RepackingReceiveSaveDto model = new()
+    {
+        ReceiveDate = DateTime.Today
+    };
+
+    List<PendingIssueDto> pendingIssues = new();
+    List<ReceiveItemVm> receiveItems = new();
+
+    PendingIssueDto? selectedIssue;
+    decimal usedQty;
+    RadzenDataGrid<ReceiveItemVm> receiveGrid;
+    DotNetObjectReference<RepackingReceiveEntry>? objRef;
+
+    //ObservableCollection<ReceiveItemVm> receiveItems = new();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;       
+    }
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadPendingAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+    }
+
+
+
+    async Task LoadPendingAsync()
+    {
+        var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+        products = await ProductApi.GetProductsAsync();
+        pendingIssues = await Api.GetPendingIssuesAsync(branchId, Id);
+        if (Id != null)
+        {
+            await LoadExistingAsync();
+        }
+        dataLoaded = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task LoadExistingAsync()
+    {
+        if (!Id.HasValue)
+            return;
+
+        var data = await Api.GetAsync(Id.Value);
+
+        model.VoucherNo = data.VoucherNo;
+        model.ReceiveDate = data.ReceiveDate;
+        model.Remarks = data.Remarks;
+
+        usedQty = data.UsedQty;
+
+        // selectedIssue = new PendingIssueDto
+        // {
+        //     IssueId = data.IssueId,
+        //     IssueItemId = data.IssueItemId,
+        //     ProductName = data.Items.First().ProductName,
+        //     PendingQty = data.UsedQty,
+        //     LotNo = data.Items.First().LotNo
+        // };
+        selectedIssue = pendingIssues
+    .First(x => x.IssueItemId == data.IssueItemId);
+
+        receiveItems = data.Items.Select(x => new ReceiveItemVm
+        {
+            ProductId = x.ProductId,
+            LotNo = x.LotNo,
+            Qty = x.Qty,
+            Rate = x.Rate,
+            IssueItemId = x.IssueItemId
+        }).ToList();
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {        
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadPendingAsync();
+            }
+        }
+    }
+
+
+    async void SelectIssueRow(DataGridRowMouseEventArgs<PendingIssueDto> args)
+    {
+        if (selectedIssue != null && Id == null)
+            return;
+
+        var row = args.Data;
+
+        // var qty = await DialogService.OpenAsync<QtyDialog>(
+        //     "Use Qty",
+        //     new Dictionary<string, object>
+        //     {
+        //     { "MaxQty", row.PendingQty }
+        //     },
+        //     new DialogOptions
+        //     {
+        //         Width = "300px",
+        //         CloseDialogOnOverlayClick = false
+        //     });
+
+        var qty = await DialogService.OpenAsync<QtyDialog>(
+                "Use Qty",
+                new Dictionary<string, object>
+                {
+                    { "MaxQty", row.PendingQty },
+                    { "InitialQty", Id != null ? usedQty : 0m }
+                },
+            new DialogOptions
+            {
+                Width = "300px",
+                CloseDialogOnOverlayClick = false
+            });
+
+        if (qty == null)
+            return;
+
+        usedQty = Convert.ToDecimal(qty);
+        selectedIssue = row;
+
+        StateHasChanged();
+    }
+
+    // async Task AddRow()
+    // {
+    //     receiveItems = receiveItems
+    //         .Append(new ReceiveItemVm { Qty = 1 })
+    //         .ToList();
+
+    //     await InvokeAsync(StateHasChanged);
+    // }
+    void AddRow()
+    {
+        receiveItems.Add(new ReceiveItemVm { Qty = 1,LotNo = selectedIssue.LotNo,IssueItemId = selectedIssue.IssueItemId });
+        StateHasChanged();
+    }
+
+
+
+    void DisableAfterSelect(RowRenderEventArgs<PendingIssueDto> args)
+    {
+        if (selectedIssue != null && Id==null)
+        {
+            args.Attributes["style"] =
+                "background:#f3f3f3; pointer-events:none; opacity:0.6;";
+        }
+    }
+    // void DisableAfterSelect(RowRenderEventArgs<PendingIssueDto> args)
+    // {
+    //     if (selectedIssue != null && !isEdit)
+    //     {
+    //         args.Attributes["style"] =
+    //             "background:#f3f3f3; opacity:0.6;";
+    //     }
+    // }
+
+
+
+
+    void Remove(ReceiveItemVm row)
+    {
+        receiveItems.Remove(row);
+    }
+
+    async Task Save()
+    {
+
+
+        if (isSaving) return;
+
+        isSaving = true;
+
+        try
+        {
+
+            if (selectedIssue == null)
+            {
+                ShowError("Please select issue row first");
+                return;
+            }
+
+            if (receiveItems.Count == 0)
+            {
+                ShowError("Add at least one receive item");
+                return;
+            }
+
+            foreach (var r in receiveItems)
+            {
+                if (r.ProductId == Guid.Empty || r.Qty <= 0)
+                {
+                    ShowError("Invalid item data");
+                    return;
+                }
+            }
+
+            model.BranchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+            model.IssueId = selectedIssue.IssueId;
+            model.IssueItemId = selectedIssue.IssueItemId;
+            model.UsedQty = usedQty;
+            model.PurchaseDate = selectedIssue.PurchaseDate;
+
+            model.Items = receiveItems.Select(x => new RepackingReceiveItemDto
+                {
+                    ProductId = x.ProductId,
+                    LotNo = x.LotNo,
+                    Qty = x.Qty,
+                    Rate = x.Rate,
+                    IssueItemId = x.IssueItemId
+                }).ToList();
+
+            var response = Id.HasValue
+                ? await Api.UpdateAsync(Id.Value, model)   // ⭐ EDIT
+                : await Api.CreateAsync(model);            // ⭐ CREATE
+
+            await HandleApiResponse(response);
+
+            Nav.NavigateTo("/inventory/repacking-receives");
+        }
+        catch (Exception ex)
+        {
+            ShowError(ex.Message);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+
+        
+    }
+
+    async Task DeleteClick()
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete voucher '{model.VoucherNo}'?",
+            "Confirm Delete");
+
+        if (confirm == true)
+        {
+            var response = await Api.DeleteAsync(Id.Value);
+            await HandleApiResponse(response);
+            StateHasChanged();
+            DialogService.Close();
+            Nav.NavigateTo("/inventory/repacking-receives");
+        }
+    }
+    void Close() => Nav.NavigateTo("/inventory/repacking-receives");
+
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+    class ReceiveItemVm
+    {
+        public Guid ProductId { get; set; }
+
+        public string ProductName { get; set; } = "";
+
+        public Guid LotNo { get; set; }
+        public Guid IssueItemId { get; set; }
+
+        public decimal Qty { get; set; } = 1;
+
+        public decimal Rate { get; set; }
+    }
+}

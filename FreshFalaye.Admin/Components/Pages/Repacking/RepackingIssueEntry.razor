@@ -246,6 +246,8 @@
                 ProductName = x.ProductName,
                 ProductGroupName = x.ProductGroupName,
                 ProductUnitName = x.ProductUnitName,
+                PurchaseDate = x.PurchaseDate,
+                VendorName = x.VendorName,
                 LotNo = x.LotNo,
                 Qty = x.Qty,
                 Rate = x.Rate,
@@ -296,6 +298,8 @@
                 ProductName = lot.ProductName,
                 ProductGroupName = lot.ProductGroupName,
                 ProductUnitName = lot.UnitName,
+                VendorName = lot.VendorName,
+                PurchaseDate = lot.PurchaseDate,
                 LotNo = lot.LotNo,
                 Qty = 1,
                 Rate = lot.Rate,
@@ -388,7 +392,9 @@
                 ProductId = x.ProductId,
                 LotNo = x.LotNo,
                 Qty = x.Qty,
-                Rate = x.Rate
+                Rate = x.Rate,
+                PurchaseDate = x.PurchaseDate,
+                VendorName = x.VendorName
             }).ToList();
 
             var response = Id == null
@@ -458,6 +464,8 @@
         public string ProductName { get; set; }
         public string ProductGroupName { get; set; }
         public string ProductUnitName { get; set; }
+        public DateTime PurchaseDate { get; set; }
+        public string VendorName { get; set; }
         public Guid LotNo { get; set; }
         public decimal BalanceQty { get; set; }
         public decimal Qty { get; set; }

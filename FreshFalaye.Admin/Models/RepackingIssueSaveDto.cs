@@ -28,5 +28,7 @@
         public decimal Qty { get; set; }
 
         public decimal Rate { get; set; }
+        public DateTime PurchaseDate { get; set; }
+        public string VendorName { get; set; }
     }
 }
