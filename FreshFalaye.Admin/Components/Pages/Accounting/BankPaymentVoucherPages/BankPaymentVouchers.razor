@@ -32,7 +32,8 @@
 
         <RadzenDataGrid Data="@voucherLedgers"
                         TItem="VoucherLedgerRowDto"
-                        AllowPaging="false"
+                        AllowFiltering = "true"
+                        FilterMode="FilterMode.Simple" PageSize="20" AllowPaging="true" AllowSorting="true"
                         RowDoubleClick="@OnRowDoubleClick"
                         Density="Density.Compact">
 
@@ -254,7 +255,7 @@
             vouchers = await VoucherApi.GetVouchersAsync("BankPayment");
             var temp = new List<VoucherLedgerRowDto>();
 
-            foreach (var _voucher in vouchers)
+            foreach (var _voucher in vouchers.OrderBy(x=>x.VoucherDate))
             {
                 foreach (var _voucherDetail in _voucher.VoucherDetails)
                 {
