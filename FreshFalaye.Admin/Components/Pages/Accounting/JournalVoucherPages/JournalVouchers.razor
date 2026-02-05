@@ -30,25 +30,12 @@
                           Click="@AddVoucher" />
         </div>
 
-        <RadzenDataGrid Data="@vouchers"
-                        TItem="VoucherDto"
-                        AllowFiltering="true"
-                        FilterMode="FilterMode.Simple"
-                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                        @ref="grid"
-                        AllowPaging="true"
-                        PageSize="15"
-                        AllowRowExpand="true"
-                        ExpandMode="DataGridExpandMode.Multiple"
-                        AllowRowSelectOnRowClick="true"
-                        SelectionMode="DataGridSelectionMode.Single"
-                        Value="@selected"
-                        ValueChanged="@OnSelectedChanged"
+        <RadzenDataGrid Data="@voucherLedgers"
+                        TItem="VoucherLedgerRowDto"
+                        AllowPaging="false"
                         RowDoubleClick="@OnRowDoubleClick"
-                        RowClick="@OnRowClick"
-                        Style="height:70vh">
+                        Density="Density.Compact">
 
-            <!-- ================= MASTER GRID ================= -->
             <Columns>
 
                 <RadzenDataGridColumn Property="VoucherDate"
@@ -56,71 +43,27 @@
                                       Width="110px"
                                       FormatString="{0:dd-MM-yyyy}" />
 
-                <RadzenDataGridColumn Property="VoucherNoString"
+                <RadzenDataGridColumn Property="VoucherNo"
                                       Title="Voucher No"
                                       Width="130px" />
 
-               @*  <RadzenDataGridColumn Property="MainAccountName"
-                                      Title="A/C. Head" /> *@
+                <RadzenDataGridColumn Property="DebitAccountName"
+                                      Title="Debit Party Name" />
 
-                <RadzenDataGridColumn Property="VoucherValue" Filterable="false"
-                                      Title="Voucher Value"
+                <RadzenDataGridColumn Property="CreditAccountName"
+                                      Title="Credit Party Name" />
+
+                <RadzenDataGridColumn Property="Amount" Filterable="false"
+                                      Title="Amount"
                                       Width="120px"
                                       TextAlign="TextAlign.Right"
                                       FormatString="{0:N2}" />
 
+                <RadzenDataGridColumn Property="RefNo" Title="Ref No" Width="130px" />
+
+                <RadzenDataGridColumn Property="Remarks" Title="Remarks" />
+
             </Columns>
-
-
-            <!-- ================= CHILD ROW TEMPLATE (OLD RADZEN SYNTAX) ================= -->
-            <Template Context="voucher">
-
-                @if (voucher.VoucherDetails != null && voucher.VoucherDetails.Any())
-                {
-                    <div style="padding:8px 0 8px 40px;background:#fafafa">
-
-                        <RadzenDataGrid Data="@voucher.VoucherDetails"
-                                        AllowFiltering="true"
-                                        FilterMode="FilterMode.Simple"
-                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                        TItem="VoucherDetailDto"
-                                        AllowPaging="false"
-                                        Density="Density.Compact">
-
-                            <Columns>
-
-                                <!-- Account -->
-                                <RadzenDataGridColumn Property="DebitAccountName" Title="Debit Account" />
-                                <RadzenDataGridColumn Property="CreditAccountName" Title="Credit Account" />
-
-                                <!-- Debit -->
-                                <RadzenDataGridColumn Title="Amount" Filterable="false"
-                                                      Width="120px"
-                                                      TextAlign="TextAlign.Right">
-                                    <Template Context="d">
-                                        @(d.DebitAccountId != null
-                                                                            ? d.Amount?.ToString("N2")
-                                                                            : "")
-                                </Template>
-                            </RadzenDataGridColumn>
-
-                                <!-- Ref -->
-                                <RadzenDataGridColumn Property="RefNo"
-                                                      Title="Ref No"
-                                                      Width="130px" />
-
-                                <!-- Remarks -->
-                                <RadzenDataGridColumn Property="Remarks"
-                                                      Title="Remarks" />
-
-                            </Columns>
-
-                        </RadzenDataGrid>
-
-                    </div>
-                                }
-
-            </Template>
 
         </RadzenDataGrid>
 
@@ -174,13 +117,15 @@
 
 @code {
     List<VoucherDto> vouchers = new();
-    IList<VoucherDto> selected = new List<VoucherDto>();
 
+    IList<VoucherLedgerRowDto> selected = new List<VoucherLedgerRowDto>();
 
+    List<VoucherLedgerRowDto> voucherLedgers = new();
 
-    VoucherDto? SelectedVoucher => selected.FirstOrDefault();
+    VoucherLedgerRowDto? SelectedVoucher => selected.FirstOrDefault();
 
-    RadzenDataGrid<VoucherDto> grid;
+    RadzenDataGrid<VoucherLedgerRowDto> grid;
+    
     ElementReference gridContainer;
 
     int selectedIndex = -1;
@@ -221,7 +166,7 @@
         {
             selectedIndex = 0;
             selected.Clear();
-            selected.Add(vouchers[0]);
+            selected.Add(voucherLedgers[0]);
         }
     }
     public void Dispose()
@@ -244,6 +189,29 @@
         try
         {
             vouchers = await VoucherApi.GetVouchersAsync("Journal");
+
+            var temp = new List<VoucherLedgerRowDto>();
+
+            foreach (var _voucher in vouchers)
+            {
+                foreach (var _voucherDetail in _voucher.VoucherDetails)
+                {
+                    temp.Add(new VoucherLedgerRowDto
+                    {
+                        Id = _voucher.Id,
+                        VoucherDate = _voucher.VoucherDate,
+                        VoucherNo = _voucher.VoucherNoString,
+                        MainAccountName = _voucher.MainAccountName,
+                        CreditAccountName = _voucherDetail.CreditAccountName,
+                        DebitAccountName = _voucherDetail.DebitAccountName,
+                        Amount = _voucherDetail.Amount,
+                        RefNo = _voucherDetail.RefNo,
+                        Remarks = _voucherDetail.Remarks,
+                        Narration = _voucher.Narration
+                    });
+                }
+            }
+            voucherLedgers = temp;
         }
         catch (ApiException ex)
         {
@@ -266,7 +234,7 @@
         await LoadVouchers();
     }
 
-    async Task EditVoucher(VoucherDto p)
+    async Task EditVoucher(VoucherLedgerRowDto p)
     {
         await DialogService.OpenAsync<JournalVoucherDialog>(
             "Edit Journal Voucher",
@@ -281,23 +249,23 @@
         await LoadVouchers();
     }
 
-    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<VoucherDto> args)
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<VoucherLedgerRowDto> args)
         => await EditVoucher(args.Data);
 
-    async Task OnRowClick(DataGridRowMouseEventArgs<VoucherDto> args)
+    async Task OnRowClick(DataGridRowMouseEventArgs<VoucherLedgerRowDto> args)
         => await JS.InvokeVoidAsync("safeFocus", gridContainer);
 
-    void OnSelectedChanged(IList<VoucherDto> items)
+    void OnSelectedChanged(IList<VoucherLedgerRowDto> items)
     {
         selected = items;
-        var view = grid.View.Cast<VoucherDto>().ToList();
+        var view = grid.View.Cast<VoucherLedgerRowDto>().ToList();
         if (SelectedVoucher != null)
             selectedIndex = view.IndexOf(SelectedVoucher);
     }
 
     async Task HandleGridKeys(KeyboardEventArgs e)
     {
-        var view = grid.View.Cast<VoucherDto>().ToList();
+        var view = grid.View.Cast<VoucherLedgerRowDto>().ToList();
         if (!view.Any()) return;
 
         switch (e.Key)
@@ -319,7 +287,7 @@
         }
     }
 
-    void SelectRow(List<VoucherDto> view)
+    void SelectRow(List<VoucherLedgerRowDto> view)
     {
         selected.Clear();
         selected.Add(view[selectedIndex]);
