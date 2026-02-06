@@ -39,7 +39,9 @@ namespace FreshFalaye.Admin.Services
                 Expense = x.ExpenseName,
                 RateType = x.RateType,
                 Bearer = x.Bearer,
-                Rate = x.Rate                
+                Rate = x.Rate  ,
+                AddDeduct = x.AddDeduct,
+                ExpenseName = x.ExpenseName
             }).ToList();
         }
 
