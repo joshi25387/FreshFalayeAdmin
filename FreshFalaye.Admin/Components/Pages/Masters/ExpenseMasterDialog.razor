@@ -40,6 +40,12 @@
                             @bind-Value="model.RateType"
                             Style="width:100%" />
         </div>
+        <div class="col-4">
+            <RadzenLabel Text="Rate Type" />
+            <RadzenDropDown Data="@addDeductTypes"
+                            @bind-Value="model.AddDeduct"
+                            Style="width:100%" />
+        </div>
 
         <div class="col-4">
             <RadzenLabel Text="Rate" />
@@ -98,7 +104,8 @@
 
     List<string> expenseTypes = new() { "Sale", "Purchase" };
     List<string> rateTypes = new() { "#", "%" };
-    List<string> bearers = new() { "Self", "Customer" };
+    List<string> addDeductTypes = new() { "Add", "Deduct" };
+    List<string> bearers = new() { "Self", "Party" };
 
     protected override async Task OnInitializedAsync()
     {
@@ -140,6 +147,7 @@
         {
             model.ExpenseType = "Purchase";
             model.RateType = "#";
+            model.AddDeduct = "Add";
             model.Bearer = "Self";
         }
 

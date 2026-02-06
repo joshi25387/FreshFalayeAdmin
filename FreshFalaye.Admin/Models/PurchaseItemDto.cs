@@ -10,7 +10,7 @@
         public decimal Rate { get; set; }
         public decimal GstPercent { get; set; }
         public decimal Amount { get; set; }
-        public string LotNo { get; set; } = null!;   // Auto-generated backend
+        public Guid? LotNo { get; set; }   // Auto-generated backend
         public int LineNo { get; set; }
     }
 

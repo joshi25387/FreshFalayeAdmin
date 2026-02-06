@@ -151,6 +151,7 @@
             <RadzenDataGridColumn Property="ExpenseName" Title="Expense" />
             <RadzenDataGridColumn Property="RateType" Title="Type" Width="60px" />
             <RadzenDataGridColumn Property="Rate" Title="Rate" Width="80px" />
+            <RadzenDataGridColumn Property="AddDeduct" Title="Add/Deduct" Width="80px" />
             <RadzenDataGridColumn Property="Amount" Title="Amount" Width="100px" />
         </Columns>
 
@@ -191,6 +192,7 @@
                             ExpenseName = x.Expense, 
                             RateType = x.RateType, 
                             Bearer = x.Bearer,
+                            AddDeduct = x.AddDeduct,
                             Rate = x.Rate }).ToList();
         await AddNewRow();
     }
@@ -296,6 +298,15 @@
                 Qty = x.Qty,
                 Rate = x.Rate,
                 GstPercent = x.GstPercent
+            }).ToList(),
+            Expenses = expenses.Select(x=>new PurchaseExpenseDto
+            {
+                AddDeduct = x.AddDeduct,
+                Bearer = x.Bearer,
+                Expense = x.ExpenseName,
+                ExpenseMasterId = x.ExpenseMasterId,
+                Rate = x.Rate,
+                RateType = x.RateType                
             }).ToList()
         });
 
