@@ -1,0 +1,194 @@
+﻿@page "/reports/stock-summary"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Components.Reports
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+@inject StockReportApiService Api
+@inject ProductApiService ProductApi
+@inject ProductGroupApiService GroupApi
+@implements IDisposable
+
+
+<RadzenCard Style="height:85vh; padding:10px;">
+    <div class="d-flex mb-1">
+        <b class="me-auto">Stock Summary Report</b>       
+    </div>
+
+    <div style="display:flex; height:100%; gap:15px;">
+
+        <!-- LEFT: Filters Panel -->
+        <div style="width:400px; background:#f8f9fa; padding:15px; border-radius:6px; overflow-y:auto;">
+
+            <RadzenLabel Text="From Date" />
+            <RadzenDatePicker @bind-Value="fromDate"
+                              Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="To Date" />
+            <RadzenDatePicker @bind-Value="toDate"
+                              Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="Item Group" />
+            <RadzenDropDown Data="@productGroups"
+                            TextProperty="GroupName"
+                            ValueProperty="ProductGroupId"
+                            @bind-Value="selectedItemGroupIds"
+                            Multiple="true"
+                            Change="OnProductGroupChanged"
+                            AllowFiltering="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            Chips="true"
+                            AllowClear = "true"
+                            Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="Item" />
+            <RadzenDropDown Data="@products"
+                            TextProperty="ProductName"
+                            ValueProperty="ProductId"
+                            @bind-Value="selectedItemIds"
+                            Multiple="true"
+                            AllowFiltering="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            Chips="true"
+                            AllowClear="true"
+                            Style="width:100%; margin-bottom:10px;" />
+
+            <div style="margin-top:10px;">
+                <RadzenCheckBox @bind-Value="withZeroStock" />
+                <RadzenLabel Text="With Zero Stock"
+                             Style="margin-left:5px;" />
+            </div>
+
+            <RadzenButton Text="View Report"
+                          Icon="search"
+                          Click="LoadReport"
+                          Style="width:100%; margin-top:20px;"
+                          ButtonStyle="ButtonStyle.Primary" />
+
+        </div>
+
+        <!-- RIGHT: Report Viewer -->
+        <div style="flex:1; overflow:hidden;">
+            <ReportViewer @ref="viewer" />
+        </div>
+
+    </div>
+
+</RadzenCard>
+
+
+@code {
+
+    private ReportViewer? viewer;
+
+    DateTime? fromDate = DateTime.Today.AddMonths(-1);
+    DateTime? toDate = DateTime.Today;
+
+    List<Guid> selectedItemGroupIds = new();
+    List<Guid> selectedItemIds = new();
+    bool withZeroStock = false;
+    bool dataLoaded;
+
+    List<ProductGroupDto> productGroups = new();
+    List<ProductDto> products = new();       // filtered list
+    List<ProductDto> allProducts = new();    // master list
+    
+    DotNetObjectReference<StockSummary>? objRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    private async Task OnProductGroupChanged(object value)
+    {
+        var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+        // Clear selected products
+        selectedItemIds.Clear();
+
+        // If no group selected → load all products
+        if (selectedItemGroupIds == null || !selectedItemGroupIds.Any())
+        {
+            products = await ProductApi.GetProductsAsync();
+        }
+        else
+        {
+            products = allProducts
+            .Where(p => selectedItemGroupIds.Contains(p.ProductGroupId))
+            .ToList();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        productGroups = await GroupApi.GetGroupsAsync();
+        allProducts = await ProductApi.GetProductsAsync();
+      
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task LoadReport()
+    {
+        var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+        var request = new StockSummaryRequest
+        {
+            BranchId = branchId,
+            FromDate = fromDate!.Value,
+            ToDate = toDate!.Value,
+            ItemGroupIds = selectedItemGroupIds.Any() ? selectedItemGroupIds : null,
+            ItemIds = selectedItemIds.Any() ? selectedItemIds : null,
+            WithZeroStock = withZeroStock
+        };
+
+        //var bytes = await Api.GetSummaryPdfAsync(request);
+
+        //await viewer!.LoadFromBytesAsync(bytes);
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }            
+        }
+    }
+
+}

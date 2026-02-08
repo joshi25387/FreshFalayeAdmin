@@ -1,0 +1,22 @@
+﻿@inject IJSRuntime JS
+
+<div style="height:100%; width:100%;">
+    <iframe id="@FrameId"
+            style="width:100%; height:100%; border:none;">
+    </iframe>
+</div>
+
+@code {
+
+    [Parameter]
+    public string FrameId { get; set; } =
+        "pdfFrame_" + Guid.NewGuid().ToString("N");
+
+    public async Task LoadFromBytesAsync(byte[] bytes)
+    {
+        await JS.InvokeVoidAsync(
+            "reportViewer.loadFromBytes",
+            FrameId,
+            bytes);
+    }
+}

@@ -106,6 +106,7 @@ builder.Services.AddScoped<RepackingIssueApiService>();
 builder.Services.AddScoped<RepackingReceiveApiService>();
 builder.Services.AddScoped<StockApiService>();
 builder.Services.AddScoped<IDashboardService, DashboardApiService>();
+builder.Services.AddScoped<StockReportApiService>();
 
 
 var app = builder.Build();

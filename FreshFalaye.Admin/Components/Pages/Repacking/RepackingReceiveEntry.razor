@@ -281,6 +281,7 @@
         selectedIssue = pendingIssues
     .First(x => x.IssueItemId == data.IssueItemId);
 
+
         receiveItems = data.Items.Select(x => new ReceiveItemVm
         {
             ProductId = x.ProductId,
@@ -359,19 +360,40 @@
     // }
     void AddRow()
     {
-        receiveItems.Add(new ReceiveItemVm { Qty = 1,LotNo = selectedIssue.LotNo,IssueItemId = selectedIssue.IssueItemId });
-        StateHasChanged();
+        if(selectedIssue!=null)
+        {
+            receiveItems.Add(new ReceiveItemVm { Qty = 1, LotNo = selectedIssue.LotNo, IssueItemId = selectedIssue.IssueItemId });
+            StateHasChanged();
+        }        
     }
 
 
 
     void DisableAfterSelect(RowRenderEventArgs<PendingIssueDto> args)
     {
-        if (selectedIssue != null && Id==null)
+        // if (selectedIssue != null && Id==null)
+        // {
+        //     args.Attributes["style"] =
+        //         "background:#f3f3f3; pointer-events:none; opacity:0.6;";
+        // }
+
+        // CREATE MODE
+        if (Id == null && selectedIssue != null)
         {
             args.Attributes["style"] =
                 "background:#f3f3f3; pointer-events:none; opacity:0.6;";
         }
+
+        // EDIT MODE
+        if (Id != null && selectedIssue != null)
+        {
+            if (args.Data.IssueItemId != selectedIssue.IssueItemId)
+            {
+                args.Attributes["style"] =
+                    "background:#f3f3f3; pointer-events:none; opacity:0.6;";
+            }
+        }
+
     }
     // void DisableAfterSelect(RowRenderEventArgs<PendingIssueDto> args)
     // {

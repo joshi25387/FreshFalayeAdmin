@@ -31,8 +31,9 @@
         <RadzenDataGrid Data="@rows"
                         TItem="RepackingReceiveListDto"
                         @ref="grid"
-                        AllowPaging="true"
-                        PageSize="15"
+                        AllowFiltering="true"
+                        FilterMode="FilterMode.Simple" PageSize="20" AllowPaging="true" AllowSorting="true"
+                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                         RowDoubleClick="@OnRowDoubleClick"
                         Style="height:70vh">
 
@@ -40,8 +41,9 @@
 
                 <RadzenDataGridColumn Property="VoucherNo" Title="Voucher" Width="120px" />
                 <RadzenDataGridColumn Property="ReceiveDate" Title="Date" Width="150px" FormatString="{0:dd-MM-yyyy}" />
-                <RadzenDataGridColumn Property="UsedQty" Title="Used Qty" Width="120px" />
-                <RadzenDataGridColumn Property="ItemCount" Title="Items" Width="100px" />
+                <RadzenDataGridColumn Property="VendorName" Title="Vendor" Width="300px" />
+                <RadzenDataGridColumn Property="ProductGroup" Title="Product Group" Width="220px" />                
+                <RadzenDataGridColumn Property="ProductName" Title="Product" Width="300px" />
                 <RadzenDataGridColumn Property="Remarks" Title="Remarks" />
 
             </Columns>

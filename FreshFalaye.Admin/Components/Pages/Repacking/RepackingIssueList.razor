@@ -30,9 +30,10 @@
 
         <RadzenDataGrid Data="@rows"
                         TItem="RepackingIssueListDto"
-                        @ref="grid"
-                        AllowPaging="true"
-                        PageSize="15"
+                        @ref="grid"                       
+                        AllowFiltering = "true"
+                        FilterMode="FilterMode.Simple" PageSize="20" AllowPaging="true" AllowSorting="true"
+                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"                        
                         RowDoubleClick="@OnRowDoubleClick"
                         Style="height:70vh">
 
@@ -40,8 +41,10 @@
 
                 <RadzenDataGridColumn Property="VoucherNo" Title="Voucher" Width="120px" />
                 <RadzenDataGridColumn Property="IssueDate" Title="Date" Width="150px" FormatString="{0:dd-MM-yyyy}" />
-                <RadzenDataGridColumn Property="TotalQty" Title="Qty" Width="100px" />
-                <RadzenDataGridColumn Property="ItemCount" Title="Items" Width="100px" />
+                <RadzenDataGridColumn Property="VendorName" Title="Vendor" Width="300px" />
+                <RadzenDataGridColumn Property="ProductGroup" Title="Product Group" Width="220px" />
+                <RadzenDataGridColumn Property="ProductName" Title="Product" Width="300px" />
+                <RadzenDataGridColumn Property="Qty" Title="Qty" Width="100px" />                
                 <RadzenDataGridColumn Property="Remarks" Title="Remarks" />
 
             </Columns>

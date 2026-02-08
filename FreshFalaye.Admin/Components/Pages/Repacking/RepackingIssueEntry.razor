@@ -72,7 +72,7 @@
                     @* <RadzenDataGridColumn Property="BalanceQty" Title="Balance" Width="100px" /> *@
                     <RadzenDataGridColumn Title="Balance" Filterable="false">
                         <Template Context="row">
-                            @GetRemainingQty(row.LotNo)
+                            @GetRemainingQty(row.LotNo,row.ProductId)
                         </Template>
                     </RadzenDataGridColumn>
                     <RadzenDataGridColumn Property="Rate" Title="Rate" Filterable="false" Width="100px" />
@@ -112,16 +112,15 @@
 
                             <input type="number"                                   
                                    class="form-control form-control-sm"   
-                                   min="1"
-                                   max="@row.BalanceQty"
-
+                                   min="1"                                   
+                                   max="@(GetRemainingQty(row.LotNo, row.ProductId))"
                                     value="@row.Qty"
                                    @oninput="@(async e => await OnQtyChanged(e, row))" />
                         </Template>
                     </RadzenDataGridColumn>
                     <RadzenDataGridColumn Title="Remaining" Width="100px">
                         <Template Context="row">
-                            <b>@row.Remaining</b>
+                            <b>@GetRemainingQty(row.LotNo, row.ProductId)</b>
                         </Template>
                     </RadzenDataGridColumn>
 
@@ -189,6 +188,9 @@
         IssueDate = DateTime.Today
     };
 
+    Dictionary<(Guid ProductId, Guid LotNo), decimal> originalIssueQty
+    = new();
+
     List<BranchBatchStockDto> availableLots = new();
     List<IssueItemVm> issueItems = new();
     bool dataLoaded;
@@ -250,17 +252,41 @@
                 VendorName = x.VendorName,
                 LotNo = x.LotNo,
                 Qty = x.Qty,
+                OriginalQty = x.Qty,
                 Rate = x.Rate,
                 BalanceQty = x.BalanceQty
             }).ToList();
 
+            originalIssueQty = model.Items
+                .GroupBy(x => (x.ProductId, x.LotNo))
+                .ToDictionary(
+                    g => (g.Key.ProductId, g.Key.LotNo),
+                    g => g.Sum(x => x.Qty)
+                );
+
             foreach (var item in issueItems)
             {
-                var lot = availableLots.FirstOrDefault(x => x.LotNo == item.LotNo);
-                if (lot != null)
+                // var lot = availableLots.FirstOrDefault(x => x.LotNo == item.LotNo);
+                var exists = availableLots.Any(x =>
+                                x.ProductId == item.ProductId &&
+                                x.LotNo == item.LotNo);
+                if (!exists)
                 {
-                    lot.BalanceQty += item.Qty;   // ⭐ add back old qty
-                    item.BalanceQty = lot.BalanceQty;
+                    // lot.BalanceQty += item.Qty;   // ⭐ add back old qty
+                    // item.BalanceQty = lot.BalanceQty;
+
+                    availableLots.Add(new BranchBatchStockDto
+                    {
+                        ProductId = item.ProductId,
+                        ProductName = item.ProductName,
+                        ProductGroupName = item.ProductGroupName,
+                        UnitName = item.ProductUnitName,
+                        VendorName = item.VendorName,
+                        PurchaseDate = item.PurchaseDate,
+                        LotNo = item.LotNo,
+                        BalanceQty = 0, // because DB is zero
+                        Rate = item.Rate
+                    });
                 }
             }
 
@@ -331,31 +357,78 @@
     }
 
 
+    // async Task OnQtyChanged(ChangeEventArgs e, IssueItemVm row)
+    // {
+    //     if (!decimal.TryParse(e.Value?.ToString(), out var val))
+    //         val = 0;
+
+    //     //val = Math.Clamp(val, 0, row.BalanceQty);
+
+    //     var maxAllowed = GetRemainingQty(row.LotNo, row.ProductId) + row.Qty;
+    //     val = Math.Clamp(val, 0, maxAllowed);
+
+    //     row.Qty = val;
+
+        
+    //     //row.Remaining = row.BalanceQty - row.Qty;
+    //     await stockGrid.Reload();        
+    // }
     async Task OnQtyChanged(ChangeEventArgs e, IssueItemVm row)
     {
         if (!decimal.TryParse(e.Value?.ToString(), out var val))
             val = 0;
 
-        val = Math.Clamp(val, 0, row.BalanceQty);
+        var lot = availableLots
+            .FirstOrDefault(x => x.LotNo == row.LotNo
+                              && x.ProductId == row.ProductId);
+
+        if (lot == null)
+            return;
+
+        var maxAllowed = lot.BalanceQty + row.OriginalQty;
+
+        val = Math.Clamp(val, 0, maxAllowed);
 
         row.Qty = val;
 
-        
-        //row.Remaining = row.BalanceQty - row.Qty;
-        await stockGrid.Reload();        
+        await stockGrid.Reload();
     }
 
 
-    decimal GetRemainingQty(Guid lotNo)
+
+
+    // decimal GetRemainingQty(Guid lotNo)
+    // {
+    //     var lot = availableLots.First(x => x.LotNo == lotNo);
+
+    //     var issued = issueItems
+    //         .Where(x => x.LotNo == lotNo)
+    //         .Sum(x => x.Qty);
+
+    //     return lot.BalanceQty - issued;        
+    // }
+    decimal GetRemainingQty(Guid lotNo, Guid productId)
     {
-        var lot = availableLots.First(x => x.LotNo == lotNo);
+        var lot = availableLots
+            .FirstOrDefault(x => x.LotNo == lotNo && x.ProductId == productId);
 
-        var issued = issueItems
-            .Where(x => x.LotNo == lotNo)
-            .Sum(x => x.Qty);
+        if (lot == null)
+            return 0;
 
-        return lot.BalanceQty - issued;        
+        var row = issueItems
+            .FirstOrDefault(x => x.LotNo == lotNo && x.ProductId == productId);
+
+        if (row == null)
+            return lot.BalanceQty;
+
+        var effectiveAvailable = lot.BalanceQty + row.OriginalQty;
+
+        return effectiveAvailable - row.Qty;
     }
+
+
+
+
 
     async Task Save()
     {
@@ -367,23 +440,40 @@
         {
 
             if (issueItems.Count == 0)
-            {                
+            {
                 ShowError("No data found for repacking, please add data first");
                 return;
             }
-            foreach (var _row in issueItems)
+
+            foreach (var row in issueItems)
             {
-                if (_row.Qty < 1)
+                if (row.Qty <= 0)
                 {
-                    ShowError("Qty can not be less than 1");
+                    ShowError("Qty must be greater than zero");
                     return;
                 }
-                else if (_row.Qty > _row.BalanceQty)
+
+                var lot = availableLots
+                    .FirstOrDefault(x =>
+                        x.LotNo == row.LotNo &&
+                        x.ProductId == row.ProductId);
+
+                if (lot == null)
                 {
-                    ShowError("Qty can not be greater than Balance Qty");
+                    ShowError("Stock record not found.");
+                    return;
+                }
+
+                // ⭐ CRITICAL FIX
+                var maxAllowed = lot.BalanceQty + row.OriginalQty;
+
+                if (row.Qty > maxAllowed)
+                {
+                    ShowError($"Qty cannot exceed {maxAllowed}");
                     return;
                 }
             }
+
 
             model.BranchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
 
@@ -469,7 +559,7 @@
         public Guid LotNo { get; set; }
         public decimal BalanceQty { get; set; }
         public decimal Qty { get; set; }
-        public decimal Rate { get; set; }
-        public decimal Remaining => BalanceQty - Qty;
+        public decimal OriginalQty { get; set; }
+        public decimal Rate { get; set; }        
     }
 }
