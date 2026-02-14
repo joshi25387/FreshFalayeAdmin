@@ -1,11 +1,11 @@
-﻿@page "/stock/purchase"
+﻿@page "/stock/sales"
 @layout MainLayout
 @rendermode InteractiveServer
 
 @using FreshFalaye.Admin.Models
 @using FreshFalaye.Admin.Services
 
-@inject PurchaseApiService PurchaseApi
+@inject SaleApiService SaleApi
 @inject DialogService DialogService
 @inject NotificationService NotificationService
 @inject IJSRuntime JS
@@ -20,20 +20,20 @@
     <RadzenCard>
 
         <div class="d-flex mb-1">
-            <b class="me-auto">Purchase Register</b>
+            <b class="me-auto">Sale Register</b>
 
             <RadzenButton Text="Add (Alt+A)"
                           Icon="add"
                           AccessKey="A"
                           Size="ButtonSize.Small"
-                          Click="@AddPurchase" />
+                          Click="@AddSale" />
         </div>
 
-        <RadzenDataGrid Data="@purchases"
-                        TItem="PurchaseListDto"
+        <RadzenDataGrid Data="@sales"
+                        TItem="SaleListDto"
                         @ref="grid"
                         AllowFiltering="true"
-                        FilterMode="FilterMode.Simple" PageSize="15" AllowPaging="true" AllowSorting="true"
+                        FilterMode="FilterMode.Simple" PageSize="10" AllowPaging="true" AllowSorting="true"
                         FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                         AllowRowSelectOnRowClick="true"
                         SelectionMode="DataGridSelectionMode.Single"
@@ -45,20 +45,24 @@
 
             <Columns>
 
-                <RadzenDataGridColumn Property="InvoiceNo"
-                                      Title="Invoice No"
+                <RadzenDataGridColumn Property="BillNo"
+                                      Title="Bill No."
                                       Width="120px" />
 
-                <RadzenDataGridColumn Property="PurchaseDate"
+                <RadzenDataGridColumn Property="SaleDate"
                                       Title="Date"
                                       Width="110px"
                                       FormatString="{0:dd-MM-yyyy}" />
 
-                <RadzenDataGridColumn Property="PartyName"
-                                      Title="Vendor" Width="250px" />
+                <RadzenDataGridColumn Property="CustomerName"
+                                      Title="Customer Name" Width="250px" />
 
-                <RadzenDataGridColumn Property="ItemTotal"
-                                      Title="Item Total"
+                <RadzenDataGridColumn Property="CustomerMobile"
+                                      Title="Customer Mobile"
+                                      Width="110px"/>
+
+                <RadzenDataGridColumn Property="SubTotal"
+                                      Title="Gross Amount"
                                       Width="110px"
                                       TextAlign="TextAlign.Right" />
 
@@ -67,7 +71,7 @@
                                       Width="110px"
                                       TextAlign="TextAlign.Right" />
 
-                <RadzenDataGridColumn Property="NetAmount"
+                <RadzenDataGridColumn Property="GrandTotal"
                                       Title="Net Amount"
                                       Width="120px"
                                       TextAlign="TextAlign.Right" />
@@ -81,12 +85,12 @@
 
 
 @code {
-    List<PurchaseListDto> purchases = new();
-    IList<PurchaseListDto> selected = new List<PurchaseListDto>();
+    List<SaleListDto> sales = new();
+    IList<SaleListDto> selected = new List<SaleListDto>();
 
-    PurchaseListDto? SelectedPurchase => selected.FirstOrDefault();
+    SaleListDto? SelectedSale => selected.FirstOrDefault();
 
-    RadzenDataGrid<PurchaseListDto> grid;
+    RadzenDataGrid<SaleListDto> grid;
     ElementReference gridContainer;
 
     int selectedIndex = -1;
@@ -112,7 +116,7 @@
     {
         dataLoaded = true;
 
-        await LoadPurchases();
+        await LoadSales();
 
         InitializeSelection();
 
@@ -123,11 +127,11 @@
     {
         selected.Clear();
 
-        if (purchases.Count > 0)
+        if (sales.Count > 0)
         {
             selectedIndex = 0;
             selected.Clear();
-            selected.Add(purchases[0]);
+            selected.Add(sales[0]);
         }
     }
     public void Dispose()
@@ -145,11 +149,11 @@
             await LoadAndInitializeAsync();
         }
     }
-    async Task LoadPurchases()
+    async Task LoadSales()
     {
         try
         {
-            purchases = await PurchaseApi.GetListAsync();
+            sales = await SaleApi.GetListAsync();
         }
         catch (ApiException ex)
         {
@@ -157,10 +161,10 @@
         }
     }
 
-    async Task AddPurchase()
+    async Task AddSale()
     {
-        await DialogService.OpenAsync<PurchaseDialog>(
-            "New Purchase",
+        await DialogService.OpenAsync<SaleDialog>(
+            "New Sale",
             null,
             new DialogOptions
             {
@@ -169,14 +173,14 @@
                 Draggable = true
             });
 
-        await LoadPurchases();
+        await LoadSales();
     }
 
-    async Task EditPurchase(PurchaseListDto p)
+    async Task EditSale(SaleListDto p)
     {
-        await DialogService.OpenAsync<PurchaseDialog>(
-            "Edit Purchase",
-            new Dictionary<string, object> { { "PurchaseId", p.PurchaseId } },
+        await DialogService.OpenAsync<SaleDialog>(
+            "Edit Sale",
+            new Dictionary<string, object> { { "SaleId", p.Id } },
             new DialogOptions
             {
                 Width = "1400px",
@@ -184,26 +188,26 @@
                 Draggable = true
             });
 
-        await LoadPurchases();
+        await LoadSales();
     }
 
-    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<PurchaseListDto> args)
-        => await EditPurchase(args.Data);
+    async Task OnRowDoubleClick(DataGridRowMouseEventArgs<SaleListDto> args)
+        => await EditSale(args.Data);
 
-    async Task OnRowClick(DataGridRowMouseEventArgs<PurchaseListDto> args)
+    async Task OnRowClick(DataGridRowMouseEventArgs<SaleListDto> args)
         => await JS.InvokeVoidAsync("safeFocus", gridContainer);
 
-    void OnSelectedChanged(IList<PurchaseListDto> items)
+    void OnSelectedChanged(IList<SaleListDto> items)
     {
         selected = items;
-        var view = grid.View.Cast<PurchaseListDto>().ToList();
-        if (SelectedPurchase != null)
-            selectedIndex = view.IndexOf(SelectedPurchase);
+        var view = grid.View.Cast<SaleListDto>().ToList();
+        if (SelectedSale != null)
+            selectedIndex = view.IndexOf(SelectedSale);
     }
 
     async Task HandleGridKeys(KeyboardEventArgs e)
     {
-        var view = grid.View.Cast<PurchaseListDto>().ToList();
+        var view = grid.View.Cast<SaleListDto>().ToList();
         if (!view.Any()) return;
 
         switch (e.Key)
@@ -219,13 +223,13 @@
                 break;
 
             case "Enter":
-                if (SelectedPurchase != null)
-                    await EditPurchase(SelectedPurchase);
+                if (SelectedSale != null)
+                    await EditSale(SelectedSale);
                 break;
         }
     }
 
-    void SelectRow(List<PurchaseListDto> view)
+    void SelectRow(List<SaleListDto> view)
     {
         selected.Clear();
         selected.Add(view[selectedIndex]);

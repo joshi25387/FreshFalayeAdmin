@@ -7,20 +7,6 @@ namespace FreshFalaye.Admin.Services
     {
         public StockReportApiService(HttpClient http) : base(http) { }
 
-        // Optional: JSON summary data (if still needed)
-        public async Task<List<StockSummaryDto>> GetSummaryAsync(
-            StockSummaryRequest request)
-        {
-            var response = await _http.PostAsJsonAsync(
-                "api/reports/stock/summary",
-                request);
-
-            response.EnsureSuccessStatusCode();
-
-            return await response.Content
-                .ReadFromJsonAsync<List<StockSummaryDto>>()
-                ?? new List<StockSummaryDto>();
-        }
 
         // PDF version
         public async Task<byte[]> GetSummaryPdfAsync(
@@ -28,6 +14,18 @@ namespace FreshFalaye.Admin.Services
         {
             var response = await _http.PostAsJsonAsync(
                 "api/reports/stock/summary-pdf",
+                request);
+
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadAsByteArrayAsync();
+        }
+
+        public async Task<byte[]> GetDetailPdfAsync(
+            StockSummaryRequest request)
+        {
+            var response = await _http.PostAsJsonAsync(
+                "api/reports/stock/detail-pdf",
                 request);
 
             response.EnsureSuccessStatusCode();

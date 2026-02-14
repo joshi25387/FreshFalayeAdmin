@@ -10,7 +10,7 @@
 
         const frame = document.getElementById(frameId);
         if (frame) {
-            frame.src = url;
+            frame.src = url + "#zoom=120";
         }
     }
 

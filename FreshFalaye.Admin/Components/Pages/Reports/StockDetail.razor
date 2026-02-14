@@ -1,4 +1,4 @@
-﻿@page "/reports/stock-summary"
+﻿@page "/reports/stock-detail"
 @rendermode InteractiveServer
 @layout MainLayout
 
@@ -15,7 +15,7 @@
 
 <RadzenCard Style="height:85vh; padding:10px;">
     <div class="d-flex mb-1">
-        <b class="me-auto">Stock Summary Report</b>       
+        <b class="me-auto">Stock Detail Report</b>
     </div>
 
     <div style="display:flex; height:100%; gap:15px;">
@@ -41,7 +41,7 @@
                             AllowFiltering="true"
                             FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                             Chips="true"
-                            AllowClear = "true"
+                            AllowClear="true"
                             Style="width:100%; margin-bottom:10px;" />
 
             <RadzenLabel Text="Item" />
@@ -62,7 +62,7 @@
                              Style="margin-left:5px;" />
             </div>
 
-           @*  <RadzenButton Text="View Report"
+            @* <RadzenButton Text="View Report"
                           Icon="search"
                           Click="LoadReport"
                           Style="width:100%; margin-top:20px;"
@@ -77,9 +77,6 @@
                           Disabled="@isLoading"
                           IsBusy="@isLoading"
                           BusyText="Loading..." />
-
-           
-
 
         </div>
 
@@ -111,7 +108,7 @@
     List<ProductDto> products = new();       // filtered list
     List<ProductDto> allProducts = new();    // master list
 
-    DotNetObjectReference<StockSummary>? objRef;
+    DotNetObjectReference<StockDetail>? objRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -177,27 +174,29 @@
         if (isLoading)
             return;
 
+
         try
         {
             isLoading = true;
             var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
 
             var request = new StockSummaryRequest
-            {
-                BranchId = branchId,
-                FromDate = fromDate!.Value,
-                ToDate = toDate!.Value,
-                ItemGroupIds = selectedItemGroupIds.Any() ? selectedItemGroupIds : null,
-                ItemIds = selectedItemIds.Any() ? selectedItemIds : null,
-                WithZeroStock = withZeroStock
-            };
+                {
+                    BranchId = branchId,
+                    FromDate = fromDate!.Value,
+                    ToDate = toDate!.Value,
+                    ItemGroupIds = selectedItemGroupIds.Any() ? selectedItemGroupIds : null,
+                    ItemIds = selectedItemIds.Any() ? selectedItemIds : null,
+                    WithZeroStock = withZeroStock
+                };
 
-            var bytes = await Api.GetSummaryPdfAsync(request);
+            var bytes = await Api.GetDetailPdfAsync(request);
 
             await viewer!.LoadFromBytesAsync(bytes);
+
         }
         finally
-        { 
+        {
             isLoading = false;
             await InvokeAsync(StateHasChanged);
         }
@@ -217,7 +216,7 @@
                 Auth.CurrentUser != null)
             {
                 await LoadDataAsync();
-            }            
+            }
         }
     }
 

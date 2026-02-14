@@ -3,6 +3,8 @@
 @using FreshFalaye.Admin.Models
 @using FreshFalaye.Admin.Services
 
+
+@inherits BasePage
 @inject PurchaseApiService PurchaseApi
 @inject ProductGroupApiService ProductGroupApi
 @inject ProductApiService ProductApi
@@ -10,10 +12,10 @@
 @inject AccountApiService PartyApi
 @inject ExpenseMasterApiService ExpenseApi
 @inject DialogService DialogService
-@inject NotificationService NotificationService
 @inject AdminAuthService Auth
 @inject IJSRuntime JS
 @implements IDisposable
+@inject NavigationManager Nav
 
 <RadzenCard Style="padding:12px">
 
@@ -220,11 +222,21 @@
 
     <!-- ================= TOTALS ================= -->
     <div class="text-end">
+        
         <div><b>Item Total:</b> ₹ @ItemTotal.ToString("0.00")</div>
         <div><b>Expense Total:</b> ₹ @ExpenseTotal.ToString("0.00")</div>
-        <div class="fs-5">
-            <b>Net Amount:</b> ₹ @NetAmount.ToString("0.00")
+        
+
+        <div class="fs-5 d-flex justify-content-between align-items-start">
+            <div>
+                <b>Net Amount (In Words): @AmountToWords.Convert(NetAmount)</b>                
+            </div>
+
+            <div class="text-end">
+                <b>Net Amount:</b> ₹ @NetAmount.ToString("0.00")
+            </div>
         </div>
+
     </div>
 
     <hr />
@@ -482,17 +494,29 @@
             }
 
 
-            if (PurchaseId == null)
-                await PurchaseApi.CreateAsync(dto);
-            else
-                await PurchaseApi.UpdateAsync(dto);
+            var response = PurchaseId == null
+                                ? await PurchaseApi.CreateAsync(dto)
+                                : await PurchaseApi.UpdateAsync(dto);
 
-            DialogService.Close(true);
+            await HandleApiResponse(response);
+
+            Nav.NavigateTo("/stock/purchase");
         }
         catch (ApiException ex)
         {
             NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
+    }
+
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
     }
 
     void Close() => DialogService.Close();

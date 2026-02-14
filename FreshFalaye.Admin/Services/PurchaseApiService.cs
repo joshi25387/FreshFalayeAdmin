@@ -10,19 +10,21 @@ namespace FreshFalaye.Admin.Services
         // ===============================
         // SAVE PURCHASE VOUCHER
         // ===============================
-        public async Task CreateAsync(PurchaseSaveDto dto)
+        public async Task<HttpResponseMessage> CreateAsync(PurchaseSaveDto dto)
         {
             var response = await _http.PostAsJsonAsync("api/purchases", dto);
-            await EnsureSuccess(response);
+            return response;
+            //await EnsureSuccess(response);
         }
 
         // ===============================
         // UDPATE PURCHASE VOUCHER
         // ===============================
-        public async Task UpdateAsync(PurchaseSaveDto dto)
+        public async Task<HttpResponseMessage> UpdateAsync(PurchaseSaveDto dto)
         {
             var response = await _http.PutAsJsonAsync("api/purchases", dto);
-            await EnsureSuccess(response);
+            return response;
+            //await EnsureSuccess(response);
         }
 
         // ===============================

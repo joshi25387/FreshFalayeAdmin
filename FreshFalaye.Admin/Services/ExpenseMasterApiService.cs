@@ -44,6 +44,24 @@ namespace FreshFalaye.Admin.Services
                 ExpenseName = x.ExpenseName
             }).ToList();
         }
+        public async Task<List<SaleExpenseDto>> GetSaleExpensesAsync()
+        {
+            var response = await _http.GetAsync("api/expense-master");
+
+            var all = await ReadResponse<List<ExpenseMasterDto>>(response);
+
+            return all.Where(x => x.ExpenseType == "Sale")
+                .OrderBy(x => x.ExpenseName).Select(x => new SaleExpenseDto
+                {
+                    ExpenseId = x.Id,
+                    Expense = x.ExpenseName,
+                    RateType = x.RateType,
+                    Bearer = x.Bearer,
+                    Rate = x.Rate,
+                    AddDeduct = x.AddDeduct,
+                    ExpenseName = x.ExpenseName
+                }).ToList();
+        }
 
     }
 }

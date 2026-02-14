@@ -25,6 +25,20 @@ namespace FreshFalaye.Admin.Services
             
         }
 
+        public async Task<List<ProductDto>> GetProductsWithStockAsync()
+        {
+            try
+            {
+                return await _http.GetFromJsonAsync<List<ProductDto>>("api/products/with-stock");
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
+
+        }
+
         public async Task<ProductDto> GetProductAsync(Guid id)
         {
             return await _http.GetFromJsonAsync<ProductDto>($"api/products/{id}");

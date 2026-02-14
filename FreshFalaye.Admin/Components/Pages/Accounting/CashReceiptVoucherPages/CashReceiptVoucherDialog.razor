@@ -161,6 +161,12 @@
                    class="form-control form-control-sm"
                    @bind="@voucher.VoucherValue" />
         </div>
+        <div class="col-md-6">
+            <label class="form-label">Total (In Words)</label>
+            <strong class="d-block">
+                @AmountToWords.Convert(voucher.VoucherValue ?? 0)
+            </strong>
+        </div>
     </div>
 
     <hr />
@@ -245,6 +251,9 @@
 
         voucherTypes = await VoucherApi.GetVoucherTypes();
         accounts = await AccountApi.GetAccountsAsync();
+
+        accounts = accounts.Where(x => x.AccountGroupName.ToUpper() != "CUSTOMER").ToList();
+
         bankVoucherModes = await VoucherApi.GetBankVoucherModes();
         cashAccounts = accounts.Where(x => x.AccountGroupName == "Cash").ToList();
 

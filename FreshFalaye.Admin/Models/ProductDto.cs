@@ -10,7 +10,7 @@
 
         public Guid UnitId { get; set; }
         public string? UnitName { get; set; }
-        public int MinimumStock { get; set; }
+        public decimal MinimumStock { get; set; }
 
         public string ProductName { get; set; } = null!;
 
@@ -18,6 +18,8 @@
         public decimal Discount { get; set; }
         public decimal SalePrice { get; set; }
         public decimal GstPercent { get; set; }
+        public decimal AvailableQty { get; set; }
+
 
         public string? ImagePath { get; set; }
         public bool IsActive { get; set; } = true;

@@ -1,0 +1,708 @@
+﻿@rendermode InteractiveServer
+
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+
+@inherits BasePage
+@inject SaleApiService SaleApi
+@inject ProductGroupApiService ProductGroupApi
+@inject ProductApiService ProductApi
+@inject UnitApiService UnitApi
+@inject AccountApiService AccountApi
+@inject ExpenseMasterApiService ExpenseApi
+@inject DialogService DialogService
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<RadzenCard Style="padding:12px">
+
+    <!-- ================= HEADER ================= -->
+    <div class="row g-2">
+
+        <div class="col-md-2">
+            <label class="form-label">Sale Date</label>
+            <input type="date"
+                   class="form-control form-control-sm"
+                   @bind="header.SaleDate" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Bill No.</label>
+            <input class="form-control form-control-sm" disabled
+                   @bind="header.BillNo" />
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Customer Name</label>
+            <input class="form-control form-control-sm"
+                   @bind="header.CustomerName" />
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Mobile</label>
+            <input class="form-control form-control-sm"
+                   @bind="header.CustomerMobile" />
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Payment Mode</label>
+            <select class="form-select form-select-sm"
+                    @bind="header.PaymentMode">
+                <option>Cash</option>
+                <option>UPI</option>
+                <option>Credit</option>
+            </select>
+        </div>
+
+    </div>
+
+    <hr />
+
+    <!-- ================= ITEMS ================= -->
+    <b>Items</b>
+
+    <table class="table table-sm table-bordered mt-1">
+        <thead class="table-light">
+            <tr>
+                <th style="width:40px">#</th>
+                <th style="width:200px">Group</th>
+                <th style="width:220px">Item</th>
+                <th style="width:120px">Unit</th>
+                <th style="width:80px">Stock</th>
+                <th style="width:80px">Qty</th>
+                <th style="width:80px">MRP</th>
+                <th style="width:80px">Disc %</th>
+                <th style="width:100px">Rate</th>
+                <th style="width:120px">Amount</th>
+                <th style="width:40px"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < items.Count; i++)
+            {
+                var index = i;
+                var row = items[i];
+
+                var availableStock = GetAvailableStock(row.ProductId);
+                <tr class="@(row.Qty > availableStock ? "table-danger" : "")">
+                    <td>@(i + 1)</td>
+
+                    <td>
+                        <select class="form-select form-select-sm"
+                                value="@row.ProductGroupId"
+                                @onchange="e => OnGroupChanged(e, row)">
+                            <option value="">--</option>
+                            @foreach (var g in productGroups)
+                            {
+                                <option value="@g.ProductGroupId">@g.GroupName</option>
+                            }
+                        </select>
+                    </td>
+
+                    <td>
+                        <select class="form-select form-select-sm"
+                                value="@row.ProductId"
+                                @onchange="e => OnProductChanged(e, row)">
+                            <option value="">--</option>
+                            @foreach (var p in products.Where(p => p.ProductGroupId == row.ProductGroupId))
+                            {
+                                <option value="@p.ProductId">@p.ProductName</option>
+                            }
+                        </select>
+                    </td>
+
+                    <td>
+                        <select class="form-select form-select-sm"
+                                value="@row.UnitId" disabled
+                                @onchange="e => OnUnitChanged(e, row)">
+                            <option value="">--</option>
+                            @foreach (var u in units)
+                            {
+                                <option value="@u.UnitId">@u.UnitName</option>
+                            }
+                        </select>
+                    </td>
+
+                    <td class="text-end">
+                        @availableStock
+                    </td>
+
+                    <td>
+                        <input type="number"
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.Qty"
+                               @oninput="e => OnQtyChanged(e, row)" />
+
+
+
+                    </td>
+                    <td>
+                        <input type="number"
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.Mrp" />
+                    </td>
+                    <td>
+                        <input type="number"
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.Discount" />
+                    </td>
+                    <td>
+                        <input type="number"
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.Rate"
+                               @oninput="e => OnRateChanged(e, row)" />
+                    </td>
+
+                    <td class="text-end">@row.TotalAmount.ToString("0.00")</td>
+
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-danger"
+                                @onclick="() => RemoveItem(index)">
+                            ✖
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button class="btn btn-sm btn-secondary"
+            @onclick="AddItem">
+        ➕ Add Item
+    </button>
+
+    <hr />
+
+    <!-- ================= EXPENSES ================= -->
+    <b>Expenses</b>
+
+    <table class="table table-sm table-bordered mt-1">
+        <thead class="table-light">
+            <tr>
+                <th style="width:40px"></th>
+                <th>Expense</th>
+                <th style="width:80px">Type</th>
+                <th style="width:100px">Rate</th>
+                <th style="width:120px">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in expenses)
+            {
+                <tr>
+                    <!-- 🔥 Checkbox -->
+                    <td class="text-center">
+                        <input type="checkbox"
+                               @bind="e.IsApplied" />
+                    </td>
+                    <td>@e.ExpenseName</td>
+                    <td>@e.RateType</td>
+
+                    <td>
+                        <input type="number"
+                               class="form-control form-control-sm"
+                               value="@e.Rate"
+                               disabled="@(!e.IsApplied)"
+                               @oninput="ev => OnExpenseRateChanged(ev, e)" />
+                    </td>
+
+                    <td class="text-end">
+                        @(e.IsApplied ? CalculateExpense(e).ToString("0.00") : "0.00")
+                    </td>                    
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <hr />
+
+    <!-- ================= TOTALS ================= -->
+    <div class="text-end">
+        <div><b>Item Total:</b> ₹ @ItemTotal.ToString("0.00")</div>
+        <div><b>Expense Total:</b> ₹ @ExpenseTotal.ToString("0.00")</div>
+
+        <div class="fs-5 d-flex justify-content-between">
+            <div>
+                <b>Net Amount (In Words): @AmountToWords.Convert(NetAmount)</b>
+            </div>
+            <div>
+                <b>Net Amount:</b> ₹ @NetAmount.ToString("0.00")
+            </div>
+        </div>
+    </div>
+
+    <hr />
+
+    <!-- ================= ACTIONS ================= -->
+    <div class="d-flex">
+        <div class="ms-auto">
+            <button class="btn btn-sm btn-primary"
+                    @onclick="Save">
+                Save
+            </button>
+
+            <button class="btn btn-sm btn-secondary ms-1"
+                    @onclick="Close">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+</RadzenCard>
+
+@code {
+
+    [Parameter] public Guid? SaleId { get; set; }
+
+    SaleHeaderDto header = new()
+    {
+        SaleDate = DateTime.Today,
+        PaymentMode = "UPI"
+    };
+
+    List<SaleItemDto> items = new();
+    List<SaleExpenseDto> expenses = new();
+
+    List<ProductGroupDto> productGroups = new();
+    List<ProductDto> products = new();
+    List<UnitDto> units = new();
+    List<AccountDto> customers = new();
+
+    bool NegativeSaleAllowed = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        productGroups = await ProductGroupApi.GetGroupsAsync();
+        products = await ProductApi.GetProductsWithStockAsync();
+        units = await UnitApi.GetUnitsAsync();
+
+        expenses = await ExpenseApi.GetSaleExpensesAsync();
+
+        if (SaleId.HasValue)
+        {
+            var dto = await SaleApi.GetAsync(SaleId.Value);
+            header.BranchId = dto.BranchId;
+            header.SaleDate = dto.SaleDate;
+            header.BillNo = dto.BillNo;
+            header.CustomerMobile = dto.CustomerMobile;
+            header.CustomerName = dto.CustomerName;
+            header.PaymentMode = dto.PaymentMode;
+            header.SaleId = dto.Id;
+            header.SyncId = dto.SyncId;
+            items = dto.Items;
+
+            foreach (var item in items)
+            {
+                item.OriginalQty = item.Qty; // 🔥 Store original qty
+            }
+
+            // 🔥 Mark applied expenses
+            foreach (var masterExpense in expenses)
+            {
+                var applied = dto.Expenses
+                    .FirstOrDefault(e => e.ExpenseId == masterExpense.ExpenseId);
+
+                if (applied != null)
+                {
+                    masterExpense.IsApplied = true;
+                    masterExpense.Rate = applied.Rate;
+                    masterExpense.RateType = applied.RateType;
+                    masterExpense.AddDeduct = applied.AddDeduct;
+                    masterExpense.Bearer = applied.Bearer;
+                }
+                else
+                {
+                    masterExpense.IsApplied = false;
+                }
+            }
+
+            //expenses = dto.Expenses;
+        }
+        else
+        {
+            AddItem();
+        }
+    }
+
+    void AddItem()
+    {
+        items.Add(new SaleItemDto
+        {
+            Qty = 1,
+            OriginalQty = 0 // 🔥 Important for edit mode
+        });
+        //items.Add(new SaleItemDto { Qty = 1 });
+    }
+
+    void RemoveItem(int index)
+    {
+        items.RemoveAt(index);
+    }
+
+    void OnGroupChanged(ChangeEventArgs e, SaleItemDto row)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            row.ProductGroupId = id;
+            row.ProductId = Guid.Empty;
+        }
+    }
+
+    void OnProductChanged(ChangeEventArgs e, SaleItemDto row)
+    {
+        if (!Guid.TryParse(e.Value?.ToString(), out var productId))
+            return;
+
+        row.ProductId = productId;
+
+        var product = products.FirstOrDefault(p => p.ProductId == productId);
+        if (product != null)
+        {
+            row.ProductName = product.ProductName; 
+            row.Discount = product.Discount;
+            row.Mrp = product.Mrp;
+            row.Rate = product.SalePrice;
+            row.UnitId = product.UnitId; 
+
+            var unit = units.FirstOrDefault(u => u.UnitId == product.UnitId);
+            if (unit != null)
+            {
+                row.UnitCode = unit.UnitCode;        // 🔥 ADD THIS
+            }
+        }
+
+        Recalculate(row);
+    }
+
+    void OnUnitChanged(ChangeEventArgs e, SaleItemDto row)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var unitId))
+            row.UnitId = unitId;
+    }
+
+    // void OnQtyChanged(ChangeEventArgs e, SaleItemDto row)
+    // {
+       
+    //     if (!decimal.TryParse(e.Value?.ToString(), out var qty))
+    //         return;
+
+    //     var availableStock = GetAvailableStock(row.ProductId);
+
+    //     if (!NegativeSaleAllowed && qty > availableStock)
+    //     {
+    //         row.Qty = availableStock;
+
+    //         NotificationService.Notify(
+    //             NotificationSeverity.Warning,
+    //             "Stock Warning",
+    //             $"Only {availableStock} items available"
+    //         );
+    //     }
+    //     else
+    //     {
+    //         row.Qty = qty;
+    //     }
+
+    //     Recalculate(row);
+    //     StateHasChanged();
+    // }
+
+    void OnQtyChanged(ChangeEventArgs e, SaleItemDto row)
+    {
+        if (!decimal.TryParse(e.Value?.ToString(), out var qty))
+            return;
+
+        row.Qty = qty;
+
+        // 🔥 Group total qty for same product
+        var groupedItems = items
+            .Where(x => x.ProductId == row.ProductId);
+
+        var totalQtyForProduct = groupedItems.Sum(x => x.Qty);
+
+        var product = products.FirstOrDefault(p => p.ProductId == row.ProductId);
+        var stock = product?.AvailableQty ?? 0;
+
+        // 🔥 Add back original qty in edit mode
+        if (SaleId.HasValue)
+        {
+            var originalQty = groupedItems.Sum(x => x.OriginalQty);
+            stock += originalQty;
+        }
+
+        if (totalQtyForProduct > stock)
+        {
+            if (!NegativeSaleAllowed)
+            {
+                // 🔥 Strict mode → block
+                row.Qty = 0;
+
+                NotificationService.Notify(
+                    NotificationSeverity.Warning,
+                    "Stock Warning",
+                    $"Only {stock} items available"
+                );
+            }
+            else
+            {
+                // 🔥 Flexible mode → allow but warn
+                NotificationService.Notify(
+                    NotificationSeverity.Warning,
+                    "Negative Stock",
+                    $"{product?.ProductName} stock will go negative."
+                );
+            }
+        }
+
+        Recalculate(row);
+        StateHasChanged();
+    }
+
+
+    bool ValidateStock(out string message)
+    {
+        if (items == null || items.Count == 0)
+        {
+            message = "At least one item must be added.";
+            return false;
+        }
+
+        // 🔥 Group by Product
+        foreach (var group in items.GroupBy(x => x.ProductId))
+        {
+            var productId = group.Key;
+
+            if (productId == null || productId == Guid.Empty)
+            {
+                message = "Please select product for all rows.";
+                return false;
+            }
+
+            var product = products.FirstOrDefault(p => p.ProductId == productId);
+            var stock = product?.AvailableQty ?? 0;
+
+            // 🔥 Total qty entered in current bill
+            var totalBillQty = group.Sum(x => x.Qty);
+
+            // 🔥 Add back original qty in edit mode
+            if (SaleId.HasValue)
+            {
+                var originalQty = group.Sum(x => x.OriginalQty);
+                stock += originalQty;
+            }
+
+            if (!NegativeSaleAllowed && totalBillQty > stock)
+            {
+                message = $"Insufficient stock for {product?.ProductName}. Available: {stock}";
+                return false;
+            }
+        }
+
+        message = string.Empty;
+        return true;
+    }
+
+
+    // bool ValidateStock(out string message)
+    // {
+    //     // 🔴 Must have at least one item
+    //     if (items == null || items.Count == 0)
+    //     {
+    //         message = "At least one item must be added.";
+    //         return false;
+    //     }
+    //     foreach (var item in items)
+    //     {
+    //         if (item.ProductId == null || item.ProductId == Guid.Empty)
+    //         {
+    //             message = "Please select product for all rows.";
+    //             return false;
+    //         }
+
+
+    //         var stock = GetAvailableStock(item.ProductId);
+
+    //         if (item.Qty > stock)
+    //         {
+    //             message = $"Insufficient stock for {item.ProductName}. Available: {stock}";
+    //             return false;
+    //         }
+
+    //         if (item.Qty <= 0)
+    //         {
+    //             message = $"Quantity must be greater than zero for {item.ProductName}.";
+    //             return false;
+    //         }
+    //     }
+
+    //     message = string.Empty;
+    //     return true;
+    // }
+
+
+    void OnRateChanged(ChangeEventArgs e, SaleItemDto row)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var rate))
+            row.Rate = rate;
+
+        Recalculate(row);
+    }
+
+    // int GetAvailableStock(Guid productId)
+    // {
+    //     var product = products.FirstOrDefault(p => p.ProductId == productId);
+    //     return product?.AvailableQty ?? 0;
+    // }
+    decimal GetAvailableStock(Guid? productId)
+    {
+        if (productId == null)
+            return 0;
+
+        var product = products.FirstOrDefault(p => p.ProductId == productId);
+        return product?.AvailableQty ?? 0;
+    }
+
+    void Recalculate(SaleItemDto row)
+    {
+        row.TotalAmount = row.Qty * row.Rate;
+    }
+
+    void OnExpenseRateChanged(ChangeEventArgs ev, SaleExpenseDto e)
+    {
+        if (decimal.TryParse(ev.Value?.ToString(), out var rate))
+            e.Rate = rate;
+    }
+
+    decimal CalculateExpense(SaleExpenseDto e)
+    {
+        int sign = e.AddDeduct == "Add" ? 1 : -1;
+
+        if (e.RateType == "%")
+            return sign * (ItemTotal * e.Rate / 100);
+
+        if (e.RateType == "@")
+            return sign * (TotalQty * e.Rate);
+
+        return sign * e.Rate;
+    }
+
+    decimal ItemTotal => items.Sum(x => x.TotalAmount);
+    decimal TotalQty => items.Sum(x => x.Qty);
+    decimal ExpenseTotal => expenses.Where(e => e.IsApplied).Sum(CalculateExpense);
+    decimal NetAmount => ItemTotal + ExpenseTotal;    
+   
+
+    // async Task Save()
+    // {
+    //     var dto = new SaleSaveDto
+    //     {            
+    //         Items = items,
+    //         Expenses = expenses
+    //     };
+
+    //     dto.BranchId = Auth.CurrentUser.BranchId;
+
+    //     var response = SaleId == null
+    //                     ? await SaleApi.CreateAsync(dto)
+    //                     : await SaleApi.UpdateAsync(dto);
+
+    //     await HandleApiResponse(response);
+
+    //     Nav.NavigateTo("/sales/list");
+    // }
+
+    async Task Save()
+    {        
+        if (!ValidateStock(out var errorMessage))
+        {
+            NotificationService.Notify(
+                NotificationSeverity.Error,
+                "Validation Error",
+                errorMessage
+            );
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+            if (product != null)
+            {
+                item.ProductName = product.ProductName;
+
+                var unit = units.FirstOrDefault(u => u.UnitId == product.UnitId);
+                if (unit != null)
+                    item.UnitCode = unit.UnitCode;
+            }
+        }
+
+        var appliedExpenses = expenses
+        .Where(e => e.IsApplied)
+        .ToList();
+
+        // 🔥 FINALIZE EXPENSE AMOUNTS BEFORE SEND
+        foreach (var e in appliedExpenses)
+        {
+            if (e.RateType == "%")
+                e.Amount = (ItemTotal * e.Rate) / 100;
+            else if (e.RateType == "@")
+                e.Amount = TotalQty * e.Rate;
+            else
+                e.Amount = e.Rate;
+        }
+        // if (NegativeSaleAllowed)
+        // {
+        //     foreach (var group in items.GroupBy(x => x.ProductId))
+        //     {
+        //         var product = products.FirstOrDefault(p => p.ProductId == group.Key);
+        //         var stock = product?.AvailableQty ?? 0;
+        //         var totalQty = group.Sum(x => x.Qty);
+
+        //         if (totalQty > stock)
+        //         {
+        //             NotificationService.Notify(
+        //                 NotificationSeverity.Warning,
+        //                 "Negative Stock",
+        //                 $"{product?.ProductName} stock will go negative."
+        //             );
+        //         }
+        //     }
+        // }
+        
+
+        var dto = new SaleSaveDto
+        {
+            SyncId = header.SyncId,
+            BranchId = header.BranchId,
+            SaleDate = header.SaleDate,
+            BillNo = header.BillNo,
+            CustomerMobile = header.CustomerMobile,
+            CustomerName = header.CustomerName,
+            PaymentMode = header.PaymentMode,   
+            GrandTotal = NetAmount,
+            SubTotal = ItemTotal,
+            
+            Items = items,
+            Expenses = appliedExpenses
+        };
+
+        dto.BranchId = Auth.CurrentUser.BranchId;
+
+
+        
+
+        var response = SaleId == null
+                        ? await SaleApi.CreateAsync(dto)
+                        : await SaleApi.UpdateAsync(dto);
+
+        await HandleApiResponse(response);
+
+        Nav.NavigateTo("/stock/sales");
+    }
+
+
+    void Close() => DialogService.Close();
+}
