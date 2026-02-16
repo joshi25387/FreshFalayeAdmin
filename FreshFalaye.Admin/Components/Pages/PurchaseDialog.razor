@@ -242,19 +242,35 @@
     <hr />
 
     <!-- ================= ACTIONS ================= -->
-    <div class="d-flex">
-        <div class="ms-auto">
-            <button class="btn btn-sm btn-primary"
-                    @onclick="Save">
-                Save
-            </button>
 
-            <button class="btn btn-sm btn-secondary ms-1"
-                    @onclick="Close">
-                Cancel
-            </button>
+    <div class="mt-3 d-flex">
+
+        @if (PurchaseId != null)
+        {
+            <RadzenButton Text="Delete (Del)"
+                          Icon="delete"
+                          ButtonStyle="ButtonStyle.Danger"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@DeleteClick" />
+        }
+
+        <div class="ms-auto">
+            <RadzenButton Text="Save (Alt+S)"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@Save"
+                          Disabled="@isSaving"
+                          IsBusy="@isSaving"
+                          BusyText="Saving..." />
+
+            <RadzenButton Text="Cancel (Esc)"
+                          ButtonType="ButtonType.Button"
+                          Size="ButtonSize.Small"
+                          Click="@Close"
+                          Style="margin-left:5px" />
         </div>
-    </div>
+    </div>    
 
 </RadzenCard>
 
@@ -268,6 +284,7 @@
     };
 
     bool dataLoaded;
+    bool isSaving = false;
 
     List<PurchaseItemDto> items = new();
     List<PurchaseExpenseDto> expenses = new();
@@ -459,18 +476,23 @@
 
     async Task Save()
     {
+
+        if (isSaving) return;
+
+        isSaving = true;
+
         try
         {
             var dto = new PurchaseSaveDto
-            {
-                Header = header,
-                Items = items,
-                Expenses = expenses
-            };
+                {
+                    Header = header,
+                    Items = items,
+                    Expenses = expenses
+                };
 
-            if(dto.Header.BranchId==Guid.Empty)
+            if (dto.Header.BranchId == Guid.Empty)
             {
-                dto.Header.BranchId = Auth.CurrentUser.BranchId;    
+                dto.Header.BranchId = Auth.CurrentUser.BranchId;
             }
 
             decimal _totalQty = dto.Items.Sum(x => x.Qty);
@@ -488,7 +510,7 @@
                 }
                 else
                 {
-                    _expense.Amount = _expense.Rate;    
+                    _expense.Amount = _expense.Rate;
                 }
                 _expense.ExpenseName = _expense.ExpenseName;
             }
@@ -506,6 +528,28 @@
         {
             NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
+        finally
+        {
+            isSaving = false;    
+        }
+    }
+
+    async Task DeleteClick()
+    {
+        if (PurchaseId!=null && PurchaseId != Guid.Empty)
+        {
+            bool? confirm = await DialogService.Confirm(
+                $"Delete purchase '{PurchaseId.ToString()}'?",
+                "Confirm Delete");
+
+            if (confirm == true)
+            {
+                var response = await PurchaseApi.DeleteAsync(PurchaseId.Value);
+                await HandleApiResponse(response);
+                StateHasChanged();
+                DialogService.Close();
+            }
+        }        
     }
 
     void ShowError(string message)

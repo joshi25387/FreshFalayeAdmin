@@ -24,11 +24,11 @@
         <div style="width:400px; background:#f8f9fa; padding:15px; border-radius:6px; overflow-y:auto;">
 
             <RadzenLabel Text="From Date" />
-            <RadzenDatePicker @bind-Value="fromDate"
+            <RadzenDatePicker @bind-Value="fromDate" ShowTime="false" DateFormat="dd-MM-yyyy"
                               Style="width:100%; margin-bottom:10px;" />
 
             <RadzenLabel Text="To Date" />
-            <RadzenDatePicker @bind-Value="toDate"
+            <RadzenDatePicker @bind-Value="toDate" ShowTime="false" DateFormat="dd-MM-yyyy"
                               Style="width:100%; margin-bottom:10px;" />
 
             <RadzenLabel Text="Item Group" />
@@ -183,8 +183,8 @@
             var request = new StockSummaryRequest
                 {
                     BranchId = branchId,
-                    FromDate = fromDate!.Value,
-                    ToDate = toDate!.Value,
+                    FromDate = fromDate!.Value.StartOfDay(),
+                    ToDate = toDate!.Value.EndOfDay(),
                     ItemGroupIds = selectedItemGroupIds.Any() ? selectedItemGroupIds : null,
                     ItemIds = selectedItemIds.Any() ? selectedItemIds : null,
                     WithZeroStock = withZeroStock

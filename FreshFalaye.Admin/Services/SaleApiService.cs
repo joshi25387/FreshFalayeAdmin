@@ -52,5 +52,10 @@ namespace FreshFalaye.Admin.Services
             var response = await _http.GetAsync("api/sales/sale-list");
             return await ReadResponse<List<SaleListDto>>(response);
         }
+
+        public async Task<HttpResponseMessage> DeleteAsync(Guid id)
+        {
+            return await _http.DeleteAsync($"api/sales/{id}");
+        }
     }
 }

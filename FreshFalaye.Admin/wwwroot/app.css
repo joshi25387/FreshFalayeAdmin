@@ -113,3 +113,30 @@ h1:focus {
 .rz-datatable th.grid-fit {
     width: 1% !important;
 }
+
+.table-scroll-wrapper {
+    max-height: 350px; /* change as needed */
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #dee2e6;
+}
+
+.table-scroll-wrapper table {
+    margin-bottom: 0;
+}
+
+.table-scroll-wrapper thead th {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa; /* same as table-light */
+    z-index: 2;
+}
+
+.table-scroll-wrapper::-webkit-scrollbar {
+    width: 6px;
+}
+
+.table-scroll-wrapper::-webkit-scrollbar-thumb {
+    background-color: #adb5bd;
+    border-radius: 3px;
+}
