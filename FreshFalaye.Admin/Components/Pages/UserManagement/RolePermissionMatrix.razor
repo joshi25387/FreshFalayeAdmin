@@ -1,0 +1,163 @@
+﻿@page "/admin/role-permissions"
+
+@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+
+@inject RoleApiService RoleApi
+@inject PermissionApiService PermissionApi
+@inject RolePermissionApiService RolePermApi
+
+<RadzenCard Style="padding:10px;height:85vh;display:flex;flex-direction:column">
+
+    <div class="row mb-2">
+        <div class="col-4">
+            <RadzenLabel Text="Role" />
+            <RadzenDropDown Data="@roles"
+                            TextProperty="RoleName"
+                            ValueProperty="Id"
+                            @bind-Value="selectedRoleId"
+                            Change="@OnRoleChanged"
+                            Style="width:100%" />
+        </div>
+
+        <div class="col-2 d-flex align-items-end">
+            <RadzenButton Text="Save"
+                          Icon="save"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small"
+                          Click="@Save" />
+        </div>
+    </div>
+
+    <RadzenDataGrid Data="@matrix"
+                    TItem="PermissionMatrixVm"
+                    Style="flex:1">
+
+        <Columns>
+
+            <RadzenDataGridColumn Property="Module" Title="Module" Width="180px" />
+            <RadzenDataGridColumn Title="" Width="70px">
+                <Template Context="row">
+                    <RadzenCheckBox @bind-Value="row.All" />
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="View" Width="90px">
+                <Template Context="row">
+                    <RadzenCheckBox @bind-Value="row.View" />
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Create" Width="90px">
+                <Template Context="row">
+                    <RadzenCheckBox @bind-Value="row.Create" />
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Edit" Width="90px">
+                <Template Context="row">
+                    <RadzenCheckBox @bind-Value="row.Edit" />
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Delete" Width="90px">
+                <Template Context="row">
+                    <RadzenCheckBox @bind-Value="row.Delete" />
+                </Template>
+            </RadzenDataGridColumn>
+
+        </Columns>
+
+    </RadzenDataGrid>
+
+</RadzenCard>
+
+@code {
+
+    List<RoleDto> roles = new();
+    List<PermissionDto> permissions = new();
+    List<PermissionMatrixVm> matrix = new();
+
+    Guid? selectedRoleId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        roles = await RoleApi.GetRolesAsync();
+        permissions = await PermissionApi.GetPermissionsAsync();
+
+        BuildMatrix();
+    }
+
+    void BuildMatrix()
+    {
+        matrix = permissions
+            .GroupBy(p => p.Module)
+            .Select(g => new PermissionMatrixVm
+            {
+                Module = g.Key,
+                ViewId = g.FirstOrDefault(x => x.Action == "View")?.Id,
+                CreateId = g.FirstOrDefault(x => x.Action == "Create")?.Id,
+                EditId = g.FirstOrDefault(x => x.Action == "Edit")?.Id,
+                DeleteId = g.FirstOrDefault(x => x.Action == "Delete")?.Id
+            })
+            .OrderBy(x => x.Module)
+            .ToList();
+    }
+
+    async Task OnRoleChanged(object value)
+    {
+        if (selectedRoleId == null) return;
+
+        var assigned = await RolePermApi.GetAsync(selectedRoleId.Value);
+
+        foreach (var row in matrix)
+        {
+            row.View = assigned.Any(x => x.PermissionId == row.ViewId && x.IsAssigned);
+            row.Create = assigned.Any(x => x.PermissionId == row.CreateId && x.IsAssigned);
+            row.Edit = assigned.Any(x => x.PermissionId == row.EditId && x.IsAssigned);
+            row.Delete = assigned.Any(x => x.PermissionId == row.DeleteId && x.IsAssigned);
+        }
+    }
+
+    async Task Save()
+    {
+        if (selectedRoleId == null)
+        {
+            ShowError("Select role first");
+            return;
+        }
+
+        var list = new List<RolePermissionDto>();
+
+        foreach (var row in matrix)
+        {
+            if (row.ViewId.HasValue)
+                list.Add(new RolePermissionDto { PermissionId = row.ViewId.Value, IsAssigned = row.View });
+
+            if (row.CreateId.HasValue)
+                list.Add(new RolePermissionDto { PermissionId = row.CreateId.Value, IsAssigned = row.Create });
+
+            if (row.EditId.HasValue)
+                list.Add(new RolePermissionDto { PermissionId = row.EditId.Value, IsAssigned = row.Edit });
+
+            if (row.DeleteId.HasValue)
+                list.Add(new RolePermissionDto { PermissionId = row.DeleteId.Value, IsAssigned = row.Delete });
+        }
+
+        var response = await RolePermApi.SaveAsync(selectedRoleId.Value, list);
+        await HandleApiResponse(response);
+    }
+
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+}

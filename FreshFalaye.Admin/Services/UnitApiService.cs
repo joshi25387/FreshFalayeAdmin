@@ -14,7 +14,16 @@ namespace FreshFalaye.Admin.Services
 
         public async Task<List<UnitDto>> GetUnitsAsync()
         {
-            return await _http.GetFromJsonAsync<List<UnitDto>>("api/units");
+            try
+            {
+                return await _http.GetFromJsonAsync<List<UnitDto>>("api/units");
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
+            
         }
 
         public async Task<UnitDto> GetUnitAsync(Guid id)

@@ -1,0 +1,108 @@
+﻿@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+
+@inject PermissionApiService Api
+@inject DialogService DialogService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+@implements IDisposable
+
+<RadzenCard Style="padding:10px">
+
+    <div class="row g-2">
+        <div class="col-12">
+            <RadzenLabel Text="Module Name" />
+            <RadzenTextBox @bind-Value="moduleName"
+                           Style="width:100%"
+                           @ref="nameBox" />
+        </div>
+    </div>
+
+    <div class="mt-3 d-flex">
+        <div class="ms-auto">
+            @if (Auth.HasPermission("UserManagement.Create") || Auth.HasPermission("UserManagement.Edit"))
+            {
+                <RadzenButton Text="Save (Alt+S)"
+                              Size="ButtonSize.Small"
+                              Click="@SaveClick" />
+            }
+
+            <RadzenButton Text="Cancel (Esc)"
+                          Size="ButtonSize.Small"
+                          Click="@Close"
+                          Style="margin-left:5px" />
+        </div>
+    </div>
+
+</RadzenCard>
+
+@code {
+
+    [Parameter] public string? ModuleName { get; set; }
+
+    string moduleName = "";
+    RadzenTextBox nameBox;
+
+    DotNetObjectReference<ModuleDialog>? objRef;
+
+    protected override void OnParametersSet()
+    {
+        moduleName = ModuleName ?? "";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+            await nameBox.FocusAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
+
+    [JSInvokable]
+    public async Task OnAltS() => await SaveClick();
+
+    [JSInvokable]
+    public Task OnEsc()
+    {
+        Close();
+        return Task.CompletedTask;
+    }
+
+    async Task SaveClick()
+    {
+        if (string.IsNullOrWhiteSpace(moduleName))
+        {
+            ShowError("Please enter Module Name");
+            return;
+        }
+
+        var response = await Api.CreateModulePermissionsAsync(moduleName.Trim());
+        await HandleApiResponse(response);
+
+        DialogService.Close();
+    }
+
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+
+    void Close() => DialogService.Close();
+}
+

@@ -37,22 +37,32 @@
         </div>
 
         <div class="mt-3 d-flex">
-
-            @if (GroupId.HasValue)
+            @if (Auth.HasPermission("Masters.Delete"))
             {
-                <RadzenButton Text="Delete (Del)"
-                              Icon="delete"
-                              ButtonStyle="ButtonStyle.Danger"
-                              ButtonType="ButtonType.Button"
-                              Size="ButtonSize.Small"
-                              Click="@DeleteClick" />
+                @if (GroupId.HasValue)
+                {
+                    <RadzenButton Text="Delete (Del)"
+                                  Icon="delete"
+                                  ButtonStyle="ButtonStyle.Danger"
+                                  ButtonType="ButtonType.Button"
+                                  Size="ButtonSize.Small"
+                                  Click="@DeleteClick" />
+                }
+
             }
+            
 
             <div class="ms-auto">
-                <RadzenButton Text="Save (Alt+S)"
-                              ButtonType="ButtonType.Button"
-                              Size="ButtonSize.Small"
-                              Click="@SaveClick" />
+
+                @if (Auth.HasPermission("Masters.Edit") || Auth.HasPermission("Masters.Create"))
+                {
+                    <RadzenButton Text="Save (Alt+S)"
+                                  ButtonType="ButtonType.Button"
+                                  Size="ButtonSize.Small"
+                                  Click="@SaveClick" />
+                }
+
+                
 
                 <RadzenButton Text="Cancel (Esc)"
                               ButtonType="ButtonType.Button"

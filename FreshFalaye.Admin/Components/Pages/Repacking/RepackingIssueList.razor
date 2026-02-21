@@ -22,10 +22,14 @@
         <div class="d-flex mb-1">
             <b class="me-auto">Repacking Issue</b>
 
-            <RadzenButton Text="Add (Alt+A)"
-                          Icon="add"
-                          Size="ButtonSize.Small"
-                          Click="@AddNew" />
+            @if (Auth.HasPermission("RepackingIssue.Create"))
+            {
+                <RadzenButton Text="Add (Alt+A)"
+                              Icon="add"
+                              Size="ButtonSize.Small"
+                              Click="@AddNew" />
+            }
+            
         </div>
 
         <RadzenDataGrid Data="@rows"

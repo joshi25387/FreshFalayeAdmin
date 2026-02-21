@@ -30,7 +30,14 @@
             <input class="form-control form-control-sm" disabled
                    @bind="header.BillNo" />
         </div>
-
+        <div class="col-md-2">
+            <label class="form-label">Sale Type</label>
+            <select class="form-select form-select-sm"
+                    @bind="header.SaleType">
+                <option value="Normal">Normal</option>
+                <option value="Wastage">Wastage</option>
+            </select>
+        </div>
         <div class="col-md-3">
             <label class="form-label">Customer Name</label>
             <input class="form-control form-control-sm"
@@ -83,12 +90,12 @@
                     var index = i;
                     var row = items[i];
 
-                    var availableStock = GetAvailableStock(row.ProductId);
+                    var availableStock = row.StockQty;
                     <tr class="@(row.Qty > availableStock ? "table-danger" : "")">
                         <td>@(i + 1)</td>
 
                         <td>
-                            <select class="form-select form-select-sm"
+                            @* <select class="form-select form-select-sm"
                                     value="@row.ProductGroupId"
                                     @onchange="e => OnGroupChanged(e, row)">
                                 <option value="">--</option>
@@ -96,11 +103,22 @@
                                 {
                                     <option value="@g.ProductGroupId">@g.GroupName</option>
                                 }
-                            </select>
+                            </select> *@
+
+                            <RadzenDropDown Data="@productGroups"
+                                            TextProperty="GroupName"
+                                            ValueProperty="ProductGroupId"
+                                            @bind-Value="row.ProductGroupId"
+                                            AllowFiltering="true"
+                                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                            Style="width:100%"
+                                            Change="@(value => OnGroupChanged(value, row))"
+                                            Class="form-select form-select-sm" />
+
                         </td>
 
                         <td>
-                            <select class="form-select form-select-sm"
+                            @* <select class="form-select form-select-sm"
                                     value="@row.ProductId"
                                     @onchange="e => OnProductChanged(e, row)">
                                 <option value="">--</option>
@@ -108,19 +126,43 @@
                                 {
                                     <option value="@p.ProductId">@p.ProductName</option>
                                 }
-                            </select>
+                            </select> *@
+
+                            <RadzenDropDown TItem="Product"
+                                            TValue="Guid"
+                                            Data="@(products.Where(p => p.ProductGroupId == row.ProductGroupId))"
+                                            TextProperty="ProductName"
+                                            ValueProperty="ProductId"
+                                            @bind-Value="row.ProductId"
+                                            AllowFiltering="true"
+                                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                            Change="@(value => OnProductChanged((Guid)value, row))"
+                                            Style="width:100%"
+                                            Class="form-select form-select-sm" />
+
                         </td>
 
                         <td>
-                            <select class="form-select form-select-sm"
-                                    value="@row.UnitId" disabled
+                           @*  <select class="form-select form-select-sm"
+                                    value="@row.UnitId"
                                     @onchange="e => OnUnitChanged(e, row)">
                                 <option value="">--</option>
                                 @foreach (var u in units)
                                 {
                                     <option value="@u.UnitId">@u.UnitName</option>
                                 }
-                            </select>
+                            </select> *@
+
+                            <RadzenDropDown TItem="Unit"
+                                            TValue="Guid"
+                                            Data="@(row.AvailableUnits ?? Enumerable.Empty<UnitDto>())"
+                                            TextProperty="UnitName"
+                                            ValueProperty="UnitId"
+                                            @bind-Value="row.UnitId"
+                                            Change="@(value => OnUnitChanged((Guid)value, row))"
+                                            Style="width:100%"
+                                            Class="form-select form-select-sm" />
+
                         </td>
 
                         <td class="text-end">
@@ -242,25 +284,32 @@
 
 
     <div class="mt-3 d-flex">
-
-        @if (SaleId != null)
-        {
-            <RadzenButton Text="Delete (Del)"
-                          Icon="delete"
-                          ButtonStyle="ButtonStyle.Danger"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@DeleteClick" />
+        @if (Auth.HasPermission("Sale.Delete"))
+        { 
+            @if (SaleId != null)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
         }
+        
 
         <div class="ms-auto">
-            <RadzenButton Text="Save (Alt+S)"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@Save"
-                          Disabled="@isSaving"
-                          IsBusy="@isSaving"
-                          BusyText="Saving..." />
+            @if (Auth.HasPermission("Sale.Edit") || Auth.HasPermission("Sale.Create"))
+            { 
+                <RadzenButton Text="Save (Alt+S)"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@Save"
+                              Disabled="@isSaving"
+                              IsBusy="@isSaving"
+                              BusyText="Saving..." />
+            }
+            
 
             <RadzenButton Text="Cancel (Esc)"
                           ButtonType="ButtonType.Button"
@@ -278,6 +327,7 @@
     SaleHeaderDto header = new()
     {
         SaleDate = DateTime.Today,
+        SaleType = "Normal",
         PaymentMode = "UPI"
     };
 
@@ -299,6 +349,7 @@
         products = await ProductApi.GetProductsWithStockAsync();
         units = await UnitApi.GetUnitsAsync();
 
+
         expenses = await ExpenseApi.GetSaleExpensesAsync();
 
         if (SaleId.HasValue)
@@ -310,6 +361,7 @@
             header.CustomerMobile = dto.CustomerMobile;
             header.CustomerName = dto.CustomerName;
             header.PaymentMode = dto.PaymentMode;
+            header.SaleType = dto.SaleType;
             header.SaleId = dto.Id;
             header.SyncId = dto.SyncId;
             items = dto.Items;
@@ -317,6 +369,33 @@
             foreach (var item in items)
             {
                 item.OriginalQty = item.Qty; // 🔥 Store original qty
+
+                var _product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+
+
+                var _availableUnits = new List<UnitDto>();
+                if (_product.UnitId == _product.SecondaryUnitId)
+                {
+                    var _unit = units.FirstOrDefault(u => u.UnitId == _product.UnitId);
+                    if (_unit != null)
+                    {
+                        _availableUnits.Add(_unit);
+                    }
+                }
+                else
+                {
+                    var _primaryUnit = units.FirstOrDefault(u => u.UnitId == _product.UnitId);
+                    var _secondaryUnit = units.FirstOrDefault(u => u.UnitId == _product.SecondaryUnitId);
+                    if (_primaryUnit != null)
+                    {
+                        _availableUnits.Add(_primaryUnit);
+                    }
+                    if (_secondaryUnit != null)
+                    {
+                        _availableUnits.Add(_secondaryUnit);
+                    }
+                }
+                item.AvailableUnits = _availableUnits;
             }
 
             // 🔥 Mark applied expenses
@@ -344,6 +423,7 @@
         else
         {
             AddItem();
+            StateHasChanged();
         }
     }
 
@@ -362,18 +442,18 @@
         items.RemoveAt(index);
     }
 
-    void OnGroupChanged(ChangeEventArgs e, SaleItemDto row)
+    void OnGroupChanged(object value, SaleItemDto row)
     {
-        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        if (Guid.TryParse(value?.ToString(), out var id))
         {
             row.ProductGroupId = id;
             row.ProductId = Guid.Empty;
         }
     }
 
-    void OnProductChanged(ChangeEventArgs e, SaleItemDto row)
+    void OnProductChanged(object value, SaleItemDto row)
     {
-        if (!Guid.TryParse(e.Value?.ToString(), out var productId))
+        if (!Guid.TryParse(value?.ToString(), out var productId))
             return;
 
         row.ProductId = productId;
@@ -381,26 +461,79 @@
         var product = products.FirstOrDefault(p => p.ProductId == productId);
         if (product != null)
         {
+            var _availableUnits = new List<UnitDto>();
+            if (product.UnitId == product.SecondaryUnitId)
+            {
+                var _unit = units.FirstOrDefault(u => u.UnitId == product.UnitId);
+                if (_unit != null)
+                { 
+                    _availableUnits.Add(_unit);
+                }               
+            }
+            else
+            {
+                var _primaryUnit = units.FirstOrDefault(u => u.UnitId == product.UnitId);
+                var _secondaryUnit = units.FirstOrDefault(u => u.UnitId == product.SecondaryUnitId);
+                if (_primaryUnit != null)
+                {
+                    _availableUnits.Add(_primaryUnit);
+                }
+                if (_secondaryUnit != null)
+                {
+                    _availableUnits.Add(_secondaryUnit);
+                }            
+            }
+
             row.ProductName = product.ProductName; 
             row.Discount = product.Discount;
             row.Mrp = product.Mrp;
             row.Rate = product.SalePrice;
-            row.UnitId = product.UnitId; 
+            row.UnitId = product.SecondaryUnitId ?? product.UnitId;
+            row.AvailableUnits = _availableUnits;
 
-            var unit = units.FirstOrDefault(u => u.UnitId == product.UnitId);
+            var unit = units.FirstOrDefault(u => u.UnitId == row.UnitId);
             if (unit != null)
             {
                 row.UnitCode = unit.UnitCode;        // 🔥 ADD THIS
+
+                if(unit.UnitId == product.SecondaryUnitId)
+                {
+                    row.StockQty = product.AvailableQty;
+                }
+                else if (unit.UnitId == product.UnitId)
+                {
+                    row.StockQty = Math.Round((product.AvailableQty/product.UnitConversionRatio),2);
+                }
             }
         }
 
         Recalculate(row);
     }
 
-    void OnUnitChanged(ChangeEventArgs e, SaleItemDto row)
+    void OnUnitChanged(object value, SaleItemDto row)
     {
-        if (Guid.TryParse(e.Value?.ToString(), out var unitId))
+        if (Guid.TryParse(value?.ToString(), out var unitId))
+        {
             row.UnitId = unitId;
+            var _unitRec = units.FirstOrDefault(u => u.UnitId == unitId);
+            var _product = products.FirstOrDefault(p => p.ProductId == row.ProductId);
+            if (_unitRec != null)
+            {
+                row.UnitCode = _unitRec.UnitCode;
+                if (_unitRec.UnitId == _product.UnitId)
+                {
+                    row.StockQty = Math.Round((_product.AvailableQty / _product.UnitConversionRatio), 2);
+                    row.Rate = Math.Round(_product.SalePrice * _product.UnitConversionRatio, 2);
+                }
+                else if (_unitRec.UnitId == _product.SecondaryUnitId)
+                {
+                    row.StockQty = _product.AvailableQty;
+                    row.Rate = _product.SalePrice;
+                }
+                Recalculate(row);
+            }
+        }
+
     }
 
     // void OnQtyChanged(ChangeEventArgs e, SaleItemDto row)
@@ -643,6 +776,12 @@
         try
         {
 
+            if (header.SaleType == "Wastage")
+            {
+                header.CustomerMobile = "6666666666";
+                header.CustomerName = "Wastage";
+            }
+
             if (!ValidateStock(out var errorMessage))
             {
                 NotificationService.Notify(
@@ -658,11 +797,7 @@
                 var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
                 if (product != null)
                 {
-                    item.ProductName = product.ProductName;
-
-                    var unit = units.FirstOrDefault(u => u.UnitId == product.UnitId);
-                    if (unit != null)
-                        item.UnitCode = unit.UnitCode;
+                    item.ProductName = product.ProductName;                   
                 }
             }
 
@@ -698,7 +833,7 @@
             //         }
             //     }
             // }
-
+            //0034  rasberry 200
 
             var dto = new SaleSaveDto
             {
@@ -709,6 +844,7 @@
                 CustomerMobile = header.CustomerMobile,
                 CustomerName = header.CustomerName,
                 PaymentMode = header.PaymentMode,
+                SaleType = header.SaleType,
                 GrandTotal = NetAmount,
                 SubTotal = ItemTotal,
 

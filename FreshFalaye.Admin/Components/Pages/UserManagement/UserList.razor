@@ -1,0 +1,106 @@
+﻿@page "/admin/users"
+
+@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+
+@inject UserApiService Api
+@inject DialogService DialogService
+@inject AdminAuthService Auth
+
+<RadzenCard Style="padding:10px;height:85vh;display:flex;flex-direction:column">
+
+    <div class="d-flex mb-2">
+        <b>Users</b>
+        @if (Auth.HasPermission("UserManagement.Create"))
+        {
+            <RadzenButton Text="Add (Alt+A)"
+                          Icon="add"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small"
+                          Click="@AddClick"
+                          Style="margin-left:auto" />
+        }
+        
+    </div>
+
+    <RadzenDataGrid Data="@users"
+                    TItem="UserDto"
+                    @ref="grid"
+                    AllowFiltering="true"
+                    AllowSorting="true"
+                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                    RowDoubleClick="@EditClick"
+                    Style="flex:1">
+
+        <Columns>
+
+            <RadzenDataGridColumn Property="Username" Title="Username" Width="180px" />
+
+            <RadzenDataGridColumn Title="Role" Width="160px">
+                <Template Context="row">
+                    @row.RoleName
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Branch" Width="160px">
+                <Template Context="row">
+                    @row.BranchName
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Active" Width="90px">
+                <Template Context="row">
+                    <RadzenCheckBox Value="@row.IsActive" Disabled="true" />
+                </Template>
+            </RadzenDataGridColumn>
+
+        </Columns>
+
+    </RadzenDataGrid>
+
+</RadzenCard>
+
+@code {
+
+    List<UserDto> users = new();
+    RadzenDataGrid<UserDto> grid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        users = await Api.GetUsersAsync();
+    }
+
+    async Task AddClick()
+    {
+        await DialogService.OpenAsync<UserDialog>(
+            "Add User",
+            null,
+            new DialogOptions { Width = "500px" });
+
+        await LoadData();
+        await grid.Reload();
+    }
+
+    async Task EditClick(DataGridRowMouseEventArgs<UserDto> args)
+    {
+        var param = new Dictionary<string, object>
+        {
+            { "UserId", args.Data.Id }
+        };
+
+        await DialogService.OpenAsync<UserDialog>(
+            "Edit User",
+            param,
+            new DialogOptions { Width = "500px" });
+
+        await LoadData();
+        await grid.Reload();
+    }
+}

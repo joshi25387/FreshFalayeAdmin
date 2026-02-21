@@ -106,8 +106,17 @@ builder.Services.AddScoped<VoucherApiService>();
 builder.Services.AddScoped<RepackingIssueApiService>();
 builder.Services.AddScoped<RepackingReceiveApiService>();
 builder.Services.AddScoped<StockApiService>();
+builder.Services.AddScoped<LedgerReportApiService>();
 builder.Services.AddScoped<IDashboardService, DashboardApiService>();
 builder.Services.AddScoped<StockReportApiService>();
+builder.Services.AddScoped<PermissionApiService>();
+builder.Services.AddScoped<RoleApiService>();
+builder.Services.AddScoped<RolePermissionApiService>();
+builder.Services.AddScoped<UserApiService>();
+builder.Services.AddScoped<BranchApiService>();
+
+builder.Services.AddServerSideBlazor()
+    .AddCircuitOptions(o => o.DetailedErrors = true);
 
 
 var app = builder.Build();

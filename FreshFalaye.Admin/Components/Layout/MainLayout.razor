@@ -26,36 +26,74 @@
                 <RadzenMenu Style="background:transparent;color:white">
                     
                     <RadzenMenuItem Text="Dashboard" Path="/dashboard" />
+
+                    @if (Auth.HasPermission("UserManagement.View"))
+                    {
+                        <RadzenMenuItem Text="User Management">
+                            <RadzenMenuItem Text="Modules" Path="/admin/modules" />
+                            <RadzenMenuItem Text="Roles" Path="/admin/roles" />
+                            <RadzenMenuItem Text="Role Permissions" Path="/admin/role-permissions" />
+                            <RadzenMenuItem Text="Users" Path="/admin/users" />
+                        </RadzenMenuItem>
+                    }
                     
-                    <RadzenMenuItem Text="Masters">
-                        <RadzenMenuItem Text="Product Units" Path="/masters/product-units" />
-                        <RadzenMenuItem Text="Product Groups" Path="/masters/product-groups" />
-                        <RadzenMenuItem Text="Account Groups" Path="/masters/account-groups" />
-                        <RadzenMenuItem Text="Accounts" Path="/masters/accounts" />
-                        <RadzenMenuItem Text="Expenses" Path="/masters/expenses" />
-                        <RadzenMenuItem Text="Products" Path="/masters/products" />
-                    </RadzenMenuItem>
 
-                    <RadzenMenuItem Text="Stock">
-                        <RadzenMenuItem Text="Purchase Entry" Path="/stock/purchase" />
-                        <RadzenMenuItem Text="Sale Entry" Path="/stock/sales" />
-                    </RadzenMenuItem>
-                    <RadzenMenuItem Text="Repacking">
-                        <RadzenMenuItem Text="Repacking Issue Entry" Path="/inventory/repacking-issues" />
-                        <RadzenMenuItem Text="Repacking Receive Entry" Path="/inventory/repacking-receives" />
-                    </RadzenMenuItem>
-                    <RadzenMenuItem Text="Vouchers">
-                        <RadzenMenuItem Text="Bank Payment" Path="/voucher/bank-payments" />
-                        <RadzenMenuItem Text="Bank Receipt" Path="/voucher/bank-receipts" />                        
-                        <RadzenMenuItem Text="Cash Payment" Path="/voucher/cash-payments" />
-                        <RadzenMenuItem Text="Cash Receipt" Path="/voucher/cash-receipts" />
-                        <RadzenMenuItem Text="Journal" Path="/voucher/journal" />
-                    </RadzenMenuItem>
-                    <RadzenMenuItem Text="Reports">
-                        <RadzenMenuItem Text="Stock Summary" Path="/reports/stock-summary" />
-                        <RadzenMenuItem Text="Stock Detail" Path="/reports/stock-detail" />
-                    </RadzenMenuItem>
+                    @if (Auth.HasPermission("Masters.View"))
+                    {
+                        <RadzenMenuItem Text="Masters">
+                            <RadzenMenuItem Text="Product Units" Path="/masters/product-units" />
+                            <RadzenMenuItem Text="Product Groups" Path="/masters/product-groups" />
+                            <RadzenMenuItem Text="Account Groups" Path="/masters/account-groups" />
+                            <RadzenMenuItem Text="Accounts" Path="/masters/accounts" />
+                            <RadzenMenuItem Text="Expenses" Path="/masters/expenses" />
+                            <RadzenMenuItem Text="Products" Path="/masters/products" />
+                        </RadzenMenuItem>
+                    }
 
+                    @if (Auth.HasPermission("Purchase.View") || Auth.HasPermission("Sale.View"))
+                    {
+                        <RadzenMenuItem Text="Stock">
+                            @if (Auth.HasPermission("Purchase.View"))
+                            {
+                                <RadzenMenuItem Text="Purchase Entry" Path="/stock/purchase" />
+                            }
+                            @if (Auth.HasPermission("Sale.View"))
+                            {
+                                <RadzenMenuItem Text="Sale Entry" Path="/stock/sales" />
+                            }                            
+                        </RadzenMenuItem>
+                    }
+                    @if (Auth.HasPermission("RepackingIssue.View") || Auth.HasPermission("RepackingReceive.View"))
+                    {
+                        <RadzenMenuItem Text="Repacking">
+                            @if (Auth.HasPermission("RepackingIssue.View"))
+                            {
+                                <RadzenMenuItem Text="Repacking Issue Entry" Path="/inventory/repacking-issues" />
+                            }
+                            @if (Auth.HasPermission("RepackingReceive.View"))
+                            {
+                                <RadzenMenuItem Text="Repacking Receive Entry" Path="/inventory/repacking-receives" />
+                            }                            
+                        </RadzenMenuItem>
+                    }
+                    @if (Auth.HasPermission("Vouchers.View"))
+                    {
+                        <RadzenMenuItem Text="Vouchers">
+                            <RadzenMenuItem Text="Bank Payment" Path="/voucher/bank-payments" />
+                            <RadzenMenuItem Text="Bank Receipt" Path="/voucher/bank-receipts" />
+                            <RadzenMenuItem Text="Cash Payment" Path="/voucher/cash-payments" />
+                            <RadzenMenuItem Text="Cash Receipt" Path="/voucher/cash-receipts" />
+                            <RadzenMenuItem Text="Journal" Path="/voucher/journal" />
+                        </RadzenMenuItem>                    
+                    }
+                    @if (Auth.HasPermission("Reports.View"))
+                    {
+                        <RadzenMenuItem Text="Reports">
+                            <RadzenMenuItem Text="Stock Summary" Path="/reports/stock-summary" />
+                            <RadzenMenuItem Text="Stock Detail" Path="/reports/stock-detail" />
+                            <RadzenMenuItem Text="Ledger Detail" Path="/reports/ledger" />
+                        </RadzenMenuItem>
+                    }                    
                     @* <RadzenMenuItem Text="Reports">
                         <RadzenMenuItem Text="Stock Report" Path="/reports/stock" />
                         <RadzenMenuItem Text="Purchase Report" Path="/reports/purchase" />

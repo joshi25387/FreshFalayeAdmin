@@ -4,6 +4,7 @@
 @rendermode InteractiveServer
 @layout MainLayout
 
+@using FreshFalaye.Admin.Components.Pages.Masters
 @using FreshFalaye.Admin.Components.Pages.Shared.Dialogs
 @using FreshFalaye.Admin.Models
 @using FreshFalaye.Admin.Services
@@ -51,8 +52,8 @@
             @selectedIssue.ProductName |
             Purchase Date: @selectedIssue.PurchaseDate.ToString("dd-MM-yyyy") |
             Party: @selectedIssue.VendorName|
-            Pending Qty: @selectedIssue.PendingQty|
-            Used Qty: <b>@usedQty</b>
+            Pending Qty: @selectedIssue.PendingQty &nbsp; @selectedIssue.ProductUnitName|
+            Used Qty: <b>@usedQty &nbsp; @selectedIssue.ProductUnitName</b>
         </div>
     }
 
@@ -70,8 +71,8 @@
             <RadzenDataGrid Data="@pendingIssues"
                             TItem="PendingIssueDto"
                             AllowFiltering="true"
-                            AllowPaging="true"
-                            PageSize="20"
+                            FilterMode="FilterMode.Simple" PageSize="10" AllowPaging="true" AllowSorting="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                             RowDoubleClick="@SelectIssueRow"
                             RowRender="@DisableAfterSelect"
                             Style="height:100%">
@@ -79,13 +80,27 @@
                 <Columns>
 
                     <RadzenDataGridColumn Property="VoucherNo" Title="Voucher" Width="100px" />
-                    <RadzenDataGridColumn Property="IssueDate" Title="Iss. Date" Width="120px" FormatString="{0:dd/MM/yyyy}" />
-                    <RadzenDataGridColumn Property="PurchaseDate" Title="Pur Date" Width="120px" FormatString="{0:dd/MM/yyyy}" />
+                    <RadzenDataGridColumn Property="IssueDate" Title="Iss. Date" Width="100px" FormatString="{0:dd/MM/yyyy}" />
+                    <RadzenDataGridColumn Property="PurchaseDate" Title="Pur Date" Width="100px" FormatString="{0:dd/MM/yyyy}" />
                     <RadzenDataGridColumn Property="ProductGroupName" Width="150px" Title="Item Grp" />
-                    <RadzenDataGridColumn Property="ProductName" Width="150px" Title="Item" />
-                    <RadzenDataGridColumn Property="VendorName" Width="150px" Title="Party" />
-                    <RadzenDataGridColumn Property="IssuedQty" Title="Iss. Qty" Width="120px" />
-                    <RadzenDataGridColumn Property="PendingQty" Title="Pndg Qty" Width="120px" />
+                    <RadzenDataGridColumn Property="ProductName" Width="140px" Title="Item" />
+                    <RadzenDataGridColumn Property="VendorName" Width="140px" Title="Party" />
+                   @*  <RadzenDataGridColumn Property="IssuedQty" Title="Iss. Qty" Width="120px" /> *@
+
+
+                    <RadzenDataGridColumn Title="Iss.Qty" Width="130px">
+                        <Template Context="row">
+                           @row.IssuedQty &nbsp; @row.ProductUnitName
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn Title="PendingQty" Width="130px">
+                        <Template Context="row">
+                            @row.PendingQty &nbsp; @row.ProductUnitName
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    @* <RadzenDataGridColumn Property="PendingQty" Title="Pndg Qty" Width="120px" /> *@
                     
 
                 </Columns>
@@ -101,6 +116,13 @@
             <div class="d-flex mb-1">
                 <b class="me-auto">Receive Items</b>
 
+                <RadzenButton Text="New Item"
+                              Icon="add_circle"                              
+                              Size="ButtonSize.Small"
+                              Click="@AddProduct"
+                              Style="margin-right:4px;background:none;border:none;color:#0d6efd;padding:0"
+                             />
+
                 <RadzenButton Text="Add"
                               Icon="add"
                               Size="ButtonSize.Small"
@@ -113,9 +135,10 @@
 
                     <thead class="table-light">
                         <tr>
-                            <th style="width:200px">Item</th>
-                            <th style="width:150px">Qty</th>                            
-                            <th style="width:60px"></th>
+                            <th style="width:150px">Item</th>
+                            <th style="width:80px">Unit</th>
+                            <th style="width:140px">Qty</th>                            
+                            <th style="width:40px"></th>
                         </tr>
                     </thead>
 
@@ -128,11 +151,16 @@
                                 <!-- Product -->
                                 <td>
                                     <RadzenDropDown Data="@products"
+                                                    AllowFiltering="true"
+                                                    FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                                                     TextProperty="ProductName"
                                                     ValueProperty="ProductId"
                                                     TValue="Guid"
                                                     @bind-Value="row.ProductId"
                                                     Style="width:100%" />
+                                </td>
+                                <td>
+                                    <span>@products.Where(p=>p.ProductId == row.ProductId).FirstOrDefault()?.SecondaryUnitName</span>
                                 </td>
 
                                 <!-- Qty -->
@@ -167,24 +195,31 @@
 
 
     <div class="border-top pt-2 mt-2 d-flex justify-content-end gap-2">
-
-        @if (Id.HasValue)
-        {
-            <RadzenButton Text="Delete (Del)"
-                          Icon="delete"
-                          ButtonStyle="ButtonStyle.Danger"
-                          Size="ButtonSize.Small"
-                          Click="@DeleteClick" />
+        @if (Auth.HasPermission("RepackingReceive.Delete"))
+        { 
+            @if (Id.HasValue)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
         }
+        
         <div class="ms-auto">
-            <RadzenButton Text="Save (Alt+S)"
-                          Icon="save"
-                          ButtonStyle="ButtonStyle.Primary"
-                          Size="ButtonSize.Small"
-                          Click="Save"
-                          Disabled="@isSaving"
-                          IsBusy="@isSaving"
-                          BusyText="Saving..." />
+            @if (Auth.HasPermission("RepackingReceive.Edit") || Auth.HasPermission("RepackingReceive.Create"))
+            { 
+                <RadzenButton Text="Save (Alt+S)"
+                              Icon="save"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Small"
+                              Click="Save"
+                              Disabled="@isSaving"
+                              IsBusy="@isSaving"
+                              BusyText="Saving..." />
+            }
+            
 
             <RadzenButton Text="Cancel (Esc)"
                           Icon="close"
@@ -291,7 +326,17 @@
             IssueItemId = x.IssueItemId
         }).ToList();
     }
+    async Task AddProduct()
+    {
+        await DialogService.OpenAsync<ProductDialog>(
+            "Add Product",
+            null,
+            new DialogOptions { Width = "720px", CloseDialogOnEsc = true, Draggable = true, Resizable = false });
 
+
+        products = await ProductApi.GetProductsAsync();
+        StateHasChanged();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {        
@@ -328,25 +373,28 @@
         //         CloseDialogOnOverlayClick = false
         //     });
 
-        var qty = await DialogService.OpenAsync<QtyDialog>(
-                "Use Qty",
-                new Dictionary<string, object>
-                {
-                    { "MaxQty", row.PendingQty },
-                    { "InitialQty", Id != null ? usedQty : 0m }
-                },
-            new DialogOptions
-            {
-                Width = "300px",
-                CloseDialogOnOverlayClick = false
-            });
+        // var qty = await DialogService.OpenAsync<QtyDialog>(
+        //         "Use Qty",
+        //         new Dictionary<string, object>
+        //         {
+        //             { "MaxQty", row.PendingQty },
+        //             { "InitialQty", Id != null ? usedQty : 0m }
+        //         },
+        //     new DialogOptions
+        //     {
+        //         Width = "300px",
+        //         CloseDialogOnOverlayClick = false
+        //     });
+
+
+        var qty = row.PendingQty;
 
         if (qty == null)
             return;
 
         usedQty = Convert.ToDecimal(qty);
         selectedIssue = row;
-
+        AddRow();
         StateHasChanged();
     }
 
@@ -362,7 +410,7 @@
     {
         if(selectedIssue!=null)
         {
-            receiveItems.Add(new ReceiveItemVm { Qty = 1, LotNo = selectedIssue.LotNo, IssueItemId = selectedIssue.IssueItemId });
+            receiveItems.Add(new ReceiveItemVm { Qty = 0, LotNo = selectedIssue.LotNo, IssueItemId = selectedIssue.IssueItemId });
             StateHasChanged();
         }        
     }

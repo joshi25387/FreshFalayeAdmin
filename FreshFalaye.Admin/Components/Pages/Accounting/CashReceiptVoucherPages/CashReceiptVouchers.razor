@@ -23,11 +23,15 @@
         <div class="d-flex mb-1">
             <b class="me-auto">Cash Receipt Vouchers</b>
 
-            <RadzenButton Text="Add (Alt+A)"
-                          Icon="add"
-                          AccessKey="A"
-                          Size="ButtonSize.Small"
-                          Click="@AddVoucher" />
+            @if (Auth.HasPermission("Vouchers.Create"))
+            {
+                <RadzenButton Text="Add (Alt+A)"
+                              Icon="add"
+                              AccessKey="A"
+                              Size="ButtonSize.Small"
+                              Click="@AddVoucher" />
+            }
+            
         </div>
 
 

@@ -7,7 +7,8 @@
 @using FreshFalaye.Admin.Models
 @using FreshFalaye.Admin.Services
 @inherits BasePage
-
+@inject ProductApiService ProductApi
+@inject UnitApiService UnitApi
 @inject DialogService DialogService
 @inject AdminAuthService Auth
 @inject RepackingIssueApiService Api
@@ -72,7 +73,7 @@
                     @* <RadzenDataGridColumn Property="BalanceQty" Title="Balance" Width="100px" /> *@
                     <RadzenDataGridColumn Title="Balance" Filterable="false">
                         <Template Context="row">
-                            @GetRemainingQty(row.LotNo,row.ProductId)
+                            @GetRemainingSecondaryQty(row.LotNo, row.ProductId)&nbsp; @row.UnitName
                         </Template>
                     </RadzenDataGridColumn>
                     <RadzenDataGridColumn Property="Rate" Title="Rate" Filterable="false" Width="100px" />
@@ -96,12 +97,25 @@
 
                 <Columns>
 
-                    <RadzenDataGridColumn Property="ProductGroupName" Title="Item Group" />
-                    <RadzenDataGridColumn Property="ProductName" Title="Item" />
-                    <RadzenDataGridColumn Property="ProductUnitName" Title="Unit" />
+                    <RadzenDataGridColumn Property="ProductGroupName" Title="Item Group" Width="100px" />
+                    <RadzenDataGridColumn Property="ProductName" Title="Item" Width="100px" />
+                    <RadzenDataGridColumn Title="Unit" Width="100px">
+                        <Template Context="row">
+                            <RadzenDropDown TItem="Unit"
+                                            TValue="Guid?"
+                                            Data="@(row.AvailableUnits ?? Enumerable.Empty<UnitDto>())"
+                                            TextProperty="UnitName"
+                                            ValueProperty="UnitId"
+                                            @bind-Value="row.UnitId"
+                                            Change="@(value => OnUnitChanged((Guid?)value, row))"
+                                            Style="width:100%"
+                                            Class="form-select form-select-sm" />
+
+                        </Template>
+                    </RadzenDataGridColumn>
                     @* <RadzenDataGridColumn Property="LotNo" Title="Lot" Width="120px" /> *@
 
-                    <RadzenDataGridColumn Title="Qty" Width="120px">
+                    <RadzenDataGridColumn Title="Qty" Width="90px">
                         <Template Context="row">
                            @*  <RadzenNumeric TValue="decimal"
                                            @bind-Value="row.Qty"
@@ -112,22 +126,20 @@
 
                             <input type="number"                                   
                                    class="form-control form-control-sm"   
-                                   min="1"                                   
-                                   max="@(GetRemainingQty(row.LotNo, row.ProductId))"
+                                   min="0"                                   
+                                   max="@row.MaxQtyAllowed"
                                     value="@row.Qty"
                                    @oninput="@(async e => await OnQtyChanged(e, row))" />
                         </Template>
                     </RadzenDataGridColumn>
-                    <RadzenDataGridColumn Title="Remaining" Width="100px">
+                    <RadzenDataGridColumn Title="Remaining" Width="180px">
                         <Template Context="row">
-                            <b>@GetRemainingQty(row.LotNo, row.ProductId)</b>
+                            <b>@GetRemainingSecondaryQty(row.LotNo, row.ProductId) &nbsp; @row.SecondaryUnitName &nbsp; /</b> &nbsp;
+                            <b>@GetPrimaryStockQty(row.LotNo, row.ProductId, row.UnitConversionRatio) &nbsp; @row.PrimaryUnitName</b>
                         </Template>
                     </RadzenDataGridColumn>
 
-
-                    <RadzenDataGridColumn Property="Rate" Title="Rate" Width="100px" />
-
-                    <RadzenDataGridColumn Title="">
+                    <RadzenDataGridColumn Title="" Width="50px">
                         <Template Context="row">
                             <RadzenButton Icon="delete"
                                           ButtonStyle="ButtonStyle.Danger"
@@ -144,24 +156,32 @@
 
     </div>
     <div class="border-top pt-2 mt-2 d-flex justify-content-end gap-2">
-
-        @if (Id.HasValue)
-        {
-            <RadzenButton Text="Delete (Del)"
-                          Icon="delete"
-                          ButtonStyle="ButtonStyle.Danger"
-                          Size="ButtonSize.Small"
-                          Click="@DeleteClick" />
+        @if (Auth.HasPermission("RepackingIssue.Delete"))
+        { 
+            @if (Id.HasValue)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
         }
+        
         <div class="ms-auto">
-            <RadzenButton Text="Save (Alt+S)"
-                          Icon="save"
-                          ButtonStyle="ButtonStyle.Primary"
-                          Size="ButtonSize.Small"
-                          Click="Save"
-                          Disabled="@isSaving"
-                          IsBusy="@isSaving"
-                          BusyText="Saving..." />
+            @if (Auth.HasPermission("RepackingIssue.Edit") || Auth.HasPermission("RepackingIssue.Create"))
+            {
+                <RadzenButton Text="Save (Alt+S)"
+                              Icon="save"
+                              ButtonStyle="ButtonStyle.Primary"
+                              Size="ButtonSize.Small"
+                              Click="Save"
+                              Disabled="@isSaving"
+                              IsBusy="@isSaving"
+                              BusyText="Saving..." />
+
+            }
+            
 
             <RadzenButton Text="Cancel (Esc)"
                           Icon="close"
@@ -193,6 +213,9 @@
 
     List<BranchBatchStockDto> availableLots = new();
     List<IssueItemVm> issueItems = new();
+
+    List<ProductDto> products = new();
+    List<UnitDto> units = new();
     bool dataLoaded;
     bool isSaving = false;
     DotNetObjectReference<RepackingIssueEntry>? objRef;
@@ -236,6 +259,9 @@
     async Task LoadDataAsync()
     {        
         var _branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+        products = await ProductApi.GetProductsAsync();
+        units = await UnitApi.GetUnitsAsync();
         availableLots = await StockApi.GetBatchStockAsync(_branchId);
 
         if (Id.HasValue)
@@ -309,7 +335,13 @@
         }
     }
 
-
+    void OnUnitChanged(object value, IssueItemVm row)
+    {
+        if (Guid.TryParse(value?.ToString(), out var unitId))
+        {
+            row.UnitId = unitId;            
+        }
+    }
     void AddLot(DataGridRowMouseEventArgs<BranchBatchStockDto> args)
     {
         var lot = args.Data;
@@ -317,19 +349,68 @@
         if (issueItems.Any(x => x.LotNo == lot.LotNo))
             return;
 
+        string primaryUnitName = "";
+        string secondaryUnitName = "";
+        decimal unitConversionRatio = 1;
+
+        Guid? primaryUnitId = null;
+        Guid? secondaryUnitId = null;
+
+        var product = products.FirstOrDefault(p => p.ProductId == lot.ProductId);
+        var _availableUnits = new List<UnitDto>();
+        if (product != null)
+        {
+            unitConversionRatio = product.UnitConversionRatio;
+            primaryUnitId = product.UnitId;
+            secondaryUnitId = product.SecondaryUnitId;
+            if (product.UnitId == product.SecondaryUnitId)
+            {
+                var _unit = units.FirstOrDefault(u => u.UnitId == product.UnitId);
+                if (_unit != null)
+                {
+                    _availableUnits.Add(_unit);                    
+                    primaryUnitName = _unit.UnitCode;
+                    secondaryUnitName = _unit.UnitCode;
+                }
+            }
+            else
+            {
+                var _primaryUnit = units.FirstOrDefault(u => u.UnitId == product.UnitId);
+                var _secondaryUnit = units.FirstOrDefault(u => u.UnitId == product.SecondaryUnitId);
+                if (_primaryUnit != null)
+                {
+                    _availableUnits.Add(_primaryUnit);                    
+                    primaryUnitName = _primaryUnit.UnitCode;
+                }
+                if (_secondaryUnit != null)
+                {
+                    _availableUnits.Add(_secondaryUnit);
+                    secondaryUnitName = _secondaryUnit.UnitCode;
+                }
+            }            
+        }
+
         issueItems = issueItems
             .Append(new IssueItemVm
             {
                 ProductId = lot.ProductId,
+                UnitId = primaryUnitId,       
+                SecondaryUnitId = secondaryUnitId,
+                PrimaryUnitId = primaryUnitId,
                 ProductName = lot.ProductName,
                 ProductGroupName = lot.ProductGroupName,
                 ProductUnitName = lot.UnitName,
                 VendorName = lot.VendorName,
                 PurchaseDate = lot.PurchaseDate,
                 LotNo = lot.LotNo,
-                Qty = 1,
+                Qty = 0,
                 Rate = lot.Rate,
-                BalanceQty = lot.BalanceQty
+                BalanceQty = lot.BalanceQty,
+                AvailableUnits = _availableUnits,
+                PrimaryUnitName = primaryUnitName,
+                SecondaryUnitName = secondaryUnitName,
+                UnitConversionRatio = unitConversionRatio,
+                MaxQtyAllowed = Math.Round((lot.BalanceQty / unitConversionRatio),2)
             })
             .ToList();
     }
@@ -369,7 +450,7 @@
 
     //     row.Qty = val;
 
-        
+
     //     //row.Remaining = row.BalanceQty - row.Qty;
     //     await stockGrid.Reload();        
     // }
@@ -387,11 +468,16 @@
 
         var maxAllowed = lot.BalanceQty + row.OriginalQty;
 
+        if (row.UnitId == row.PrimaryUnitId)
+        {
+            maxAllowed = Math.Round((lot.BalanceQty + row.OriginalQty) / row.UnitConversionRatio, 2);
+        }
+
         val = Math.Clamp(val, 0, maxAllowed);
 
         row.Qty = val;
 
-        await stockGrid.Reload();
+        // await stockGrid.Reload();
     }
 
 
@@ -407,7 +493,10 @@
 
     //     return lot.BalanceQty - issued;        
     // }
-    decimal GetRemainingQty(Guid lotNo, Guid productId)
+
+
+
+    decimal GetRemainingSecondaryQty(Guid lotNo, Guid productId)
     {
         var lot = availableLots
             .FirstOrDefault(x => x.LotNo == lotNo && x.ProductId == productId);
@@ -423,10 +512,40 @@
 
         var effectiveAvailable = lot.BalanceQty + row.OriginalQty;
 
-        return effectiveAvailable - row.Qty;
+        decimal _enteredQty = row.Qty;
+
+        if (row.UnitId == row.PrimaryUnitId)
+        {            
+            _enteredQty = Math.Round((_enteredQty * row.UnitConversionRatio), 2);
+        }        
+        return effectiveAvailable - _enteredQty < 0 ? 0 : effectiveAvailable - _enteredQty;
     }
 
+    decimal GetPrimaryStockQty(Guid lotNo, Guid productId,decimal unitConversionRatio)
+    {
+        var lot = availableLots
+        .FirstOrDefault(x => x.LotNo == lotNo && x.ProductId == productId);
 
+        if (lot == null)
+            return 0;
+
+        var row = issueItems
+            .FirstOrDefault(x => x.LotNo == lotNo && x.ProductId == productId);
+
+        if (row == null)
+            return lot.BalanceQty;
+
+        var effectiveAvailable = Math.Round((lot.BalanceQty + row.OriginalQty)/row.UnitConversionRatio,2);
+
+        var _enteredQty= row.Qty;
+
+        if (row.UnitId == row.SecondaryUnitId)
+        {
+            _enteredQty = Math.Round((_enteredQty / row.UnitConversionRatio), 2);
+        }
+
+        return effectiveAvailable - _enteredQty < 0 ? 0 : effectiveAvailable - _enteredQty;
+    }
 
 
 
@@ -484,7 +603,8 @@
                 Qty = x.Qty,
                 Rate = x.Rate,
                 PurchaseDate = x.PurchaseDate,
-                VendorName = x.VendorName
+                VendorName = x.VendorName,
+                UnitId = x.UnitId.Value
             }).ToList();
 
             var response = Id == null
@@ -551,15 +671,24 @@
     class IssueItemVm
     {
         public Guid ProductId { get; set; }
+        public Guid? UnitId { get; set; }
+        public Guid? PrimaryUnitId { get; set; }
+        public Guid? SecondaryUnitId { get; set; }
+        public List<UnitDto> AvailableUnits { get; set; }
         public string ProductName { get; set; }
         public string ProductGroupName { get; set; }
         public string ProductUnitName { get; set; }
+        public string PrimaryUnitName { get; set; }
+        public string SecondaryUnitName { get; set; }
         public DateTime PurchaseDate { get; set; }
         public string VendorName { get; set; }
         public Guid LotNo { get; set; }
         public decimal BalanceQty { get; set; }
         public decimal Qty { get; set; }
+        public decimal SecondaryQty { get; set; }
         public decimal OriginalQty { get; set; }
         public decimal Rate { get; set; }        
+        public decimal UnitConversionRatio { get; set; }        
+        public decimal MaxQtyAllowed { get; set; }        
     }
 }

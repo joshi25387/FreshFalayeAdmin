@@ -1,0 +1,224 @@
+﻿@page "/reports/ledger"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Components.Reports
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+@inject LedgerReportApiService Api
+@inject AccountApiService AccountApi
+@inject AccountGroupApiService AccountGroupApi
+@implements IDisposable
+
+
+<RadzenCard Style="height:85vh; padding:10px;">
+    <div class="d-flex mb-1">
+        <b class="me-auto">Ledger Report</b>
+    </div>
+
+    <div style="display:flex; height:100%; gap:15px;">
+
+        <!-- LEFT: Filters Panel -->
+        <div style="width:400px; background:#f8f9fa; padding:15px; border-radius:6px; overflow-y:auto;">
+
+            <RadzenLabel Text="From Date" />
+            <RadzenDatePicker @bind-Value="fromDate" ShowTime="false" DateFormat="dd-MM-yyyy"
+                              Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="To Date" />
+            <RadzenDatePicker @bind-Value="toDate" ShowTime="false" DateFormat="dd-MM-yyyy"
+                              Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="Account Group" />
+            <RadzenDropDown Data="@groups"
+                            TextProperty="GroupName"
+                            ValueProperty="Id"
+                            @bind-Value="selectedAccountGroupIds"
+                            Multiple="true"
+                            Change="OnAccountGroupChanged"
+                            AllowFiltering="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            Chips="true"
+                            AllowClear="true"
+                            Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="Account" />
+            <RadzenDropDown Data="@accounts"
+                            TextProperty="AccountName"
+                            ValueProperty="Id"
+                            @bind-Value="selectedAccountIds"
+                            Multiple="true"
+                            AllowFiltering="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            Chips="true"
+                            AllowClear="true"
+                            Style="width:100%; margin-bottom:10px;" />
+
+            <div style="margin-top:10px;">
+                <RadzenCheckBox @bind-Value="onSeparatePage" />
+                <RadzenLabel Text="On Separate Page"
+                             Style="margin-left:5px;" />
+            </div>
+
+            @*  <RadzenButton Text="View Report"
+                          Icon="search"
+                          Click="LoadReport"
+                          Style="width:100%; margin-top:20px;"
+                          ButtonStyle="ButtonStyle.Primary" /> *@
+
+
+            <RadzenButton Text="View Report"
+                          Icon="search"
+                          Click="LoadReport"
+                          Style="width:100%; margin-top:20px;"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Disabled="@isLoading"
+                          IsBusy="@isLoading"
+                          BusyText="Loading..." />
+
+
+
+
+        </div>
+
+        <!-- RIGHT: Report Viewer -->
+        <div style="flex:1; overflow:hidden;">
+            <ReportViewer @ref="viewer" />
+        </div>
+
+    </div>
+
+</RadzenCard>
+
+
+@code {
+
+    private ReportViewer? viewer;
+
+    bool isLoading = false;
+
+    DateTime? fromDate = DateTime.Today.AddMonths(-1);
+    DateTime? toDate = DateTime.Today;
+
+    List<Guid> selectedAccountGroupIds = new();
+    List<Guid> selectedAccountIds = new();
+    bool onSeparatePage = false;
+    bool dataLoaded;
+
+    List<AccountGroupDto> groups = new();
+    List<AccountDto> accounts = new();       // filtered list    
+    List<AccountDto> allAccounts = new();       // filtered list    
+
+    DotNetObjectReference<Ledger>? objRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    private async Task OnAccountGroupChanged(object value)
+    {
+        var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+        // Clear selected products
+        selectedAccountIds.Clear();
+
+        // If no group selected → load all products
+        if (selectedAccountGroupIds == null || !selectedAccountGroupIds.Any())
+        {
+            accounts = await AccountApi.GetAccountsAsync();
+        }
+        else
+        {
+            accounts = allAccounts
+            .Where(p => selectedAccountGroupIds.Contains(p.AccountGroupId))
+            .ToList();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        groups = await AccountGroupApi.GetAccountGroupsAsync();
+        allAccounts = await AccountApi.GetAccountsAsync();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task LoadReport()
+    {
+
+        if (isLoading)
+            return;
+
+        try
+        {
+            isLoading = true;
+            var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+            var request = new LedgerReportDto
+            {
+                BranchId = branchId,
+                FromDate = fromDate!.Value.StartOfDay(),
+                ToDate = toDate!.Value.EndOfDay(),
+                AccountGroupIds = selectedAccountGroupIds.Any() ? selectedAccountGroupIds : null,
+                AccountIds = selectedAccountIds.Any() ? selectedAccountIds : null,
+                OnSeparatePage = onSeparatePage
+            };
+
+            var bytes = await Api.GetLedgerReportAsync(request);
+
+            await viewer!.LoadFromBytesAsync(bytes);
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+
+
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        }
+    }
+
+}

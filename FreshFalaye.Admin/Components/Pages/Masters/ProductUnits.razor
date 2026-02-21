@@ -21,12 +21,17 @@
         <div class="d-flex mb-1">
             <b class="me-auto">Product Units</b>
 
-            <RadzenButton Text="Add (Alt+A)"
-                          Icon="add"
-                          ButtonType="ButtonType.Button"
-                          AccessKey="A"
-                          Size="ButtonSize.Small"
-                          Click="@AddUnit" />
+            @if (Auth.HasPermission("Masters.Create"))
+            {
+                <RadzenButton Text="Add (Alt+A)"
+                              Icon="add"
+                              ButtonType="ButtonType.Button"
+                              AccessKey="A"
+                              Size="ButtonSize.Small"
+                              Click="@AddUnit" />
+            }
+
+            
         </div>
 
         <RadzenDataGrid Data="@units"

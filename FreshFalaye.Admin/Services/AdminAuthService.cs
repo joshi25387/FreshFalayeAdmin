@@ -78,6 +78,11 @@ namespace FreshFalaye.Admin.Services
             }
         }
 
+
+        public bool HasPermission(string permission)
+        {
+            return CurrentUser?.Permissions?.Contains(permission) == true;
+        }
         public async Task LogoutAsync()
         {
             CurrentUser = null;

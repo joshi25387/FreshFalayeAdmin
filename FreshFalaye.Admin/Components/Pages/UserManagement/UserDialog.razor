@@ -1,0 +1,244 @@
+﻿@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+
+@inject UserApiService Api
+@inject RoleApiService RoleApi
+@inject BranchApiService BranchApi
+@inject DialogService DialogService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+@implements IDisposable
+
+<RadzenCard Style="padding:10px">
+
+    <div class="row g-2">
+
+        <div class="col-6">
+            <RadzenLabel Text="Username" />
+            <RadzenTextBox @bind-Value="model.Username"
+                           Style="width:100%"
+                           @ref="nameBox" />
+        </div>
+
+        <div class="col-6">
+            <RadzenLabel Text="Password" />
+            <RadzenPassword @bind-Value="model.Password"
+                            Style="width:100%" />
+        </div>
+        <div class="col-6">
+            <RadzenLabel Text="Confirm Password" />
+            <RadzenPassword @bind-Value="model.ConfirmPassword"
+                            Style="width:100%" />
+        </div>
+
+        <div class="col-6">
+            <RadzenLabel Text="Role" />
+            <RadzenDropDown Data="@roles"
+                            TextProperty="RoleName"
+                            ValueProperty="Id"
+                            @bind-Value="model.RoleId"
+                            Style="width:100%" />
+        </div>
+
+        <div class="col-6">
+            <RadzenLabel Text="Branch" />
+            <RadzenDropDown Data="@branches"
+                            TextProperty="BranchName"
+                            ValueProperty="Id"
+                            @bind-Value="model.BranchId"
+                            Style="width:100%" />
+        </div>
+
+        <div class="col-12">
+            <RadzenCheckBox @bind-Value="model.IsActive" />
+            <RadzenLabel Text="Active" Style="margin-left:8px" />
+        </div>
+
+    </div>
+
+    <div class="mt-3 d-flex">
+        @if (Auth.HasPermission("UserManagement.Delete"))
+        {
+            @if (UserId.HasValue)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
+
+        }
+        
+
+        <div class="ms-auto">
+
+            @if (Auth.HasPermission("UserManagement.Create") || Auth.HasPermission("UserManagement.Edit"))
+            {
+                <RadzenButton Text="Save (Alt+S)"
+                              Size="ButtonSize.Small"
+                              Click="@SaveClick" />
+
+            }
+            
+
+            <RadzenButton Text="Cancel (Esc)"
+                          Size="ButtonSize.Small"
+                          Click="@Close"
+                          Style="margin-left:5px" />
+        </div>
+    </div>
+
+</RadzenCard>
+@code {
+
+    [Parameter] public Guid? UserId { get; set; }
+
+    UserDto model = new();
+    RadzenTextBox nameBox;
+
+    List<RoleDto> roles = new();
+    List<BranchDto> branches = new();
+
+    DotNetObjectReference<UserDialog>? objRef;
+    bool dataLoaded;
+
+    protected override void OnInitialized()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        roles = await RoleApi.GetRolesAsync();
+        branches = await BranchApi.GetBranchesAsync();
+
+        if (UserId.HasValue)
+        {
+            var list = await Api.GetUsersAsync();
+            model = list.FirstOrDefault(x => x.Id == UserId) ?? new();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+
+            await nameBox.FocusAsync();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnAltS() => await SaveClick();
+
+    [JSInvokable]
+    public Task OnEsc()
+    {
+        Close();
+        return Task.CompletedTask;
+    }
+
+    async Task SaveClick()
+    {
+        if (string.IsNullOrWhiteSpace(model.Username))
+        {
+            ShowError("Enter username");
+            return;
+        }
+        if (UserId == null)
+        {
+            if (string.IsNullOrWhiteSpace(model.Password))
+            {
+                ShowError("Enter password");
+                return;
+            }
+
+            if (model.Password != model.ConfirmPassword)
+            {
+                ShowError("Password and Confirm Password do not match");
+                return;
+            }
+        }
+
+        if (UserId != null && !string.IsNullOrWhiteSpace(model.Password))
+        {
+            if (model.Password != model.ConfirmPassword)
+            {
+                ShowError("Password and Confirm Password do not match");
+                return;
+            }
+        }
+
+        var response = UserId == null
+            ? await Api.CreateAsync(model)
+            : await Api.UpdateAsync(model.Id, model);
+
+        await HandleApiResponse(response);
+
+        if (response.IsSuccessStatusCode)
+            DialogService.Close();
+    }
+
+    async Task DeleteClick()
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete user '{model.Username}'?",
+            "Confirm Delete");
+
+        if (confirm == true)
+        {
+            var response = await Api.DeleteAsync(model.Id);
+            await HandleApiResponse(response);
+            DialogService.Close();
+        }
+    }
+
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+
+    void Close() => DialogService.Close();
+}

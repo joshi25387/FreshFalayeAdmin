@@ -6,6 +6,10 @@
         public Guid ProductId { get; set; }
         public Guid UnitId { get; set; }
         public decimal Qty { get; set; }
+        public Guid? SecondaryUnitId { get; set; }
+        public decimal PrimaryUnitQty { get; set; }
+        public decimal UnitConversionRatio { get; set; }
+        public string AmountCalculatedOnUnit { get; set; }
         public decimal QIS { get; set; }
         public decimal Rate { get; set; }
         public decimal GstPercent { get; set; }

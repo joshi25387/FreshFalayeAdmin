@@ -15,6 +15,7 @@
         public decimal ExpenseTotal { get; set; }
         public decimal GrandTotal { get; set; }
         public string PaymentMode { get; set; } = "";
+        public string SaleType { get; set; } = "Normal";
         public int SyncVersion { get; set; }
     }
 }

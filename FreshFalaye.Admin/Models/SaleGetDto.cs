@@ -13,6 +13,7 @@
         public decimal GstTotal { get; set; }
         public decimal GrandTotal { get; set; }
         public string PaymentMode { get; set; } = null!;
+        public string SaleType { get; set; } = "Normal";
         public List<SaleItemDto> Items { get; set; } = new();
         public List<SaleExpenseDto> Expenses { get; set; } = new();
     }

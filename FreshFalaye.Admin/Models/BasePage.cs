@@ -58,6 +58,20 @@ namespace FreshFalaye.Admin.Models
                 return;
             }
 
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Forbidden",
+                    Detail = string.IsNullOrWhiteSpace(message)
+                        ? "You are not authorized to perform this action"
+                        : message,
+                    Duration = 4000
+                });
+                return;
+            }
+
             // ❌ EVERYTHING ELSE (500, etc.)
             NotificationService.Notify(new NotificationMessage
             {

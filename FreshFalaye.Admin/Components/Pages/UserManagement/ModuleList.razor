@@ -1,0 +1,119 @@
+﻿@page "/admin/modules"
+
+@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+
+@inject PermissionApiService Api
+@inject DialogService DialogService
+@inject AdminAuthService Auth
+@inject IJSRuntime JS
+
+<RadzenCard Style="padding:10px;height:85vh;display:flex;flex-direction:column">
+
+    <div class="d-flex mb-2">
+        <b>Modules</b>
+        @if (Auth.HasPermission("UserManagement.Create"))
+        { 
+            <RadzenButton Text="Add (Alt+A)"
+                          Icon="add"
+                          AccessKey="A"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Size="ButtonSize.Small"
+                          Click="@AddClick"
+                          Style="margin-left:auto" />
+        }
+        
+    </div>
+
+    <RadzenDataGrid Data="@modules"
+                    TItem="string"
+                    @ref="grid"
+                    RowDoubleClick="@EditClick"
+                    AllowFiltering="true"
+                    Style="flex:1">
+
+        <Columns>
+            <RadzenDataGridColumn Title="Module">
+                <Template Context="row">@row</Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="" Width="80px" Filterable="false">
+                <Template Context="row">
+                    @if (Auth.HasPermission("UserManagement.Delete"))
+                    {
+                        
+                        <RadzenButton Icon="delete"
+                                      ButtonStyle="ButtonStyle.Danger"
+                                      Size="ButtonSize.Small"
+                                      Click="@(() => Delete(row))" />
+                    }
+                    
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+
+    </RadzenDataGrid>
+
+</RadzenCard>
+@code {
+
+    List<string> modules = new();
+    RadzenDataGrid<string> grid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        modules = await Api.GetModulesAsync();
+    }
+
+    async Task AddClick()
+    {
+        await DialogService.OpenAsync<ModuleDialog>(
+            "Add Module",
+            null,
+            new DialogOptions { Width = "400px" });
+
+        await LoadData();
+        await grid.Reload();
+    }
+
+    async Task EditClick(DataGridRowMouseEventArgs<string> args)
+    {
+        var param = new Dictionary<string, object>
+        {
+            { "ModuleName", args.Data }
+        };
+
+        await DialogService.OpenAsync<ModuleDialog>(
+            "Edit Module",
+            param,
+            new DialogOptions { Width = "400px" });
+
+        await LoadData();
+        await grid.Reload();
+    }
+
+    async Task Delete(string module)
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete module '{module}'?",
+            "Confirm Delete");
+
+        if (confirm == true)
+        {
+            var response = await Api.DeleteModuleAsync(module);
+            await HandleApiResponse(response);
+
+            await LoadData();
+            await grid.Reload();
+        }
+    }
+}
+
+

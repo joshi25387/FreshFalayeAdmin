@@ -2,22 +2,26 @@
 {
     public class BranchDto
     {
-        public Guid BranchId { get; set; }
+        public Guid Id { get; set; }
         public string BranchCode { get; set; } = null!;
         public string BranchName { get; set; } = null!;
         public string? Address { get; set; }
         public string? City { get; set; }
         public bool IsActive { get; set; } = true;
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
     }
 
     public class BranchBatchStockDto
     {
         public Guid ProductId { get; set; }
+        public Guid UnitId { get; set; }
+        public Guid PrimaryUnitId { get; set; }
 
         public string ProductName { get; set; } = string.Empty;
         public string ProductGroupName { get; set; } = string.Empty;
         public string UnitName { get; set; } = string.Empty;
+        public string PrimaryUnitName { get; set; } = string.Empty;
+        public decimal UnitConversionRatio { get; set; }
         public string VendorName { get; set; } = string.Empty;
         public Guid LotNo { get; set; }
 

@@ -1,0 +1,193 @@
+﻿@rendermode InteractiveServer
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inherits BasePage
+
+@inject RoleApiService Api
+@inject DialogService DialogService
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+
+@implements IDisposable
+
+<RadzenCard Style="padding:10px">
+
+    <div class="row g-2">
+
+        <div class="col-12">
+            <RadzenLabel Text="Role Name" />
+            <RadzenTextBox @bind-Value="model.RoleName"
+                           Style="width:100%"
+                           @ref="nameBox" />
+        </div>
+
+        <div class="col-12">
+            <RadzenLabel Text="Description" />
+            <RadzenTextBox @bind-Value="model.Description"
+                           Style="width:100%" />
+        </div>
+
+        <div class="col-12">
+            <RadzenCheckBox @bind-Value="model.IsActive" />
+            <RadzenLabel Text="Active" Style="margin-left:8px" />
+        </div>
+
+    </div>
+
+    <div class="mt-3 d-flex">
+        @if (Auth.HasPermission("UserManagement.Delete"))
+        {
+            @if (RoleId.HasValue)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
+
+        }
+        
+
+        <div class="ms-auto">
+            @if (Auth.HasPermission("UserManagement.Create") || Auth.HasPermission("UserManagement.Edit"))
+            {
+                <RadzenButton Text="Save (Alt+S)"
+                              Size="ButtonSize.Small"
+                              Click="@SaveClick" />
+
+            }
+            
+
+            <RadzenButton Text="Cancel (Esc)"
+                          Size="ButtonSize.Small"
+                          Click="@Close"
+                          Style="margin-left:5px" />
+        </div>
+    </div>
+
+</RadzenCard>
+@code {
+
+    [Parameter] public Guid? RoleId { get; set; }
+
+    RoleDto model = new();
+    RadzenTextBox nameBox;
+
+    DotNetObjectReference<RoleDialog>? objRef;
+    bool dataLoaded;
+
+    protected override void OnInitialized()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        if (RoleId.HasValue)
+        {
+            var list = await Api.GetRolesAsync();
+            model = list.FirstOrDefault(x => x.Id == RoleId) ?? new();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+
+            await nameBox.FocusAsync();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnAltS() => await SaveClick();
+
+    [JSInvokable]
+    public Task OnEsc()
+    {
+        Close();
+        return Task.CompletedTask;
+    }
+
+    async Task SaveClick()
+    {
+        if (string.IsNullOrWhiteSpace(model.RoleName))
+        {
+            ShowError("Please enter Role Name");
+            return;
+        }
+
+        model.RoleName = model.RoleName.Trim();
+
+        var response = RoleId == null
+            ? await Api.CreateAsync(model)
+            : await Api.UpdateAsync(model.Id, model);
+
+        await HandleApiResponse(response);
+
+        if (response.IsSuccessStatusCode)
+        {
+            DialogService.Close();
+        }
+    }
+
+    async Task DeleteClick()
+    {
+        bool? confirm = await DialogService.Confirm(
+            $"Delete role '{model.RoleName}'?",
+            "Confirm Delete");
+
+        if (confirm == true)
+        {
+            var response = await Api.DeleteAsync(model.Id);
+            await HandleApiResponse(response);
+            DialogService.Close();
+        }
+    }
+
+    void ShowError(string message)
+    {
+        NotificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Error,
+            Summary = "Error",
+            Detail = message,
+            Duration = 4000
+        });
+    }
+
+    void Close() => DialogService.Close();
+}

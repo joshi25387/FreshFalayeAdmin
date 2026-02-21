@@ -1,5 +1,6 @@
 ﻿@rendermode InteractiveServer
 
+@using FreshFalaye.Admin.Components.Pages.Masters
 @using FreshFalaye.Admin.Models
 @using FreshFalaye.Admin.Services
 
@@ -30,7 +31,18 @@
         </div>
 
         <div class="col-md-3">
-            <label class="form-label">Supplier</label>
+            <label class="form-label">
+                <div class="d-flex align-items-center">
+                    <span class="me-1">Vendor</span>
+
+                    <RadzenButton Icon="add_circle"
+                                  Size="ButtonSize.Small"
+                                  Click="@AddVendor"
+                                  Style="background:none;border:none;padding:0;color:#0d6efd"
+                                  Title="Add New Vendor" />
+                </div>
+                
+            </label>
             <select class="form-select form-select-sm"
                     @bind="header.AccountId">
                 <option value="">-- select --</option>
@@ -82,13 +94,36 @@
         <thead class="table-light">
             <tr>
                 <th style="width:40px">#</th>
-                <th>Group</th>
-                <th>Item</th>
-                <th style="width:120px">Packing</th>
-                <th style="width:80px">Qty</th>
+                <th style="width:130px">
+                    <div class="d-flex align-items-center">
+                        <span class="me-1">Group</span>
+
+                        <RadzenButton Icon="add_circle"
+                                      Size="ButtonSize.Small" 
+                                      Click="@AddProductGroup"
+                                      Style="background:none;border:none;padding:0;color:#0d6efd"
+                                      Title="Add New Produc Group" />
+                    </div>                    
+                </th>
+                <th style="width:170px">
+                    <div class="d-flex align-items-center">
+                        <span class="me-1">Item</span>
+
+                        <RadzenButton Icon="add_circle"
+                                      Size="ButtonSize.Small"
+                                      Click="@AddProduct"
+                                      Style="background:none;border:none;padding:0;color:#0d6efd"
+                                      Title="Add New Product" />
+                    </div> 
+                </th>
+                <th style="width:100px">P. Unit</th>
+                <th style="width:100px">Sec. Unit</th>
+                <th style="width:100px">Conv.Ratio</th>
+                <th style="width:80px">P. Qty</th>
                 <th style="width:100px">Rate</th>
-                <th style="width:80px">GST %</th>
-                <th style="width:120px">Amount</th>
+                <th style="width:70px">GST %</th>
+                <th style="width:80px">Sec. Qty</th>                              
+                <th style="width:100px">Amount</th>
                 <th style="width:40px"></th>
             </tr>
         </thead>
@@ -101,23 +136,35 @@
                     <td>@(i + 1)</td>
 
                     <!-- Product Group -->
-                    <td>
-                        <!-- Product Group -->
-                        <select class="form-select form-select-sm"
-                                value="@row.ProductGroupId"
-                                @onchange="e => OnGroupChanged(e, row)">
-                            <option value="">--</option>
-                            @foreach (var g in productGroups)
-                            {
-                                <option value="@g.ProductGroupId">@g.GroupName</option>
-                            }
-                        </select>
+                    <td>                
+                        <RadzenDropDown Data="@productGroups"
+                                        TextProperty="GroupName"
+                                        ValueProperty="ProductGroupId"
+                                        @bind-Value="row.ProductGroupId"
+                                        AllowFiltering="true"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        Style="width:100%"
+                                        Change="@(value => OnGroupChanged(value, row))"
+                                        Class="form-select form-select-sm" />                    
                     </td>
 
                     <!-- Product -->
                     <td>
                         <!-- Product -->
-                        <select class="form-select form-select-sm"
+
+                        <RadzenDropDown TItem="Product"
+                                        TValue="Guid"
+                                        Data="@(products.Where(p => p.ProductGroupId == row.ProductGroupId))"
+                                        TextProperty="ProductName"
+                                        ValueProperty="ProductId"
+                                        @bind-Value="row.ProductId"
+                                        AllowFiltering="true"
+                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                        Change="@(value => OnProductChanged((Guid)value, row))"
+                                        Style="width:100%"
+                                        Class="form-select form-select-sm" />
+
+                        @* <select class="form-select form-select-sm"
                                 value="@row.ProductId"
                                 @onchange="e => OnProductChanged(e, row)">
                             <option value="">--</option>
@@ -125,13 +172,13 @@
                             {
                                 <option value="@p.ProductId">@p.ProductName</option>
                             }
-                        </select>
+                        </select> *@
                     </td>
 
                     <!-- Packing (Unit) -->
                     <td>
                         <select class="form-select form-select-sm"
-                                value="@row.UnitId"
+                                value="@row.UnitId" disabled
                                 @onchange="e => OnUnitChanged(e, row)">
                             <option value="">--</option>
                             @foreach (var u in units)
@@ -140,14 +187,30 @@
                             }
                         </select>
                     </td>
-
+                    <td>
+                        <select class="form-select form-select-sm"
+                                value="@row.SecondaryUnitId" disabled
+                                @onchange="e => OnUnitChanged(e, row)">
+                            <option value="">--</option>
+                            @foreach (var u in units)
+                            {
+                                <option value="@u.UnitId">@u.UnitName</option>
+                            }
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" disabled
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.UnitConversionRatio" />
+                    </td>
                     <!-- Qty -->
                     <td>
                         <input type="number"
                                step="0.01"
                                class="form-control form-control-sm"
-                               value="@row.Qty"
-                               @oninput="e => OnQtyChanged(e, row)" />
+                               value="@row.PrimaryUnitQty"
+                               @oninput="e => OnPrimaryUnitQtyChanged(e, row)" />
                     </td>
 
                     <!-- Rate -->
@@ -159,8 +222,20 @@
                                @oninput="e => OnRateChanged(e, row)" />
                     </td>
 
+
                     <!-- GST -->
                     <td class="text-end">@row.GstPercent</td>
+                    <!-- Qty -->
+                    <td>
+                        <input type="number"
+                               step="0.01"
+                               class="form-control form-control-sm"
+                               value="@row.Qty"
+                               @oninput="e => OnQtyChanged(e, row)" />
+                    </td>
+
+                    
+
 
                     <!-- Amount -->
                     <td class="text-end">@row.Amount.ToString("0.00")</td>
@@ -185,7 +260,17 @@
     <hr />
 
     <!-- ================= EXPENSES ================= -->
-    <b>Expenses</b>
+    <b>
+        <div class="d-flex align-items-center">
+            <span class="me-1">Expenses</span>
+
+            <RadzenButton Icon="add_circle"
+                          Size="ButtonSize.Small"
+                          Click="@AddExpense"
+                          Style="background:none;border:none;padding:0;color:#0d6efd"
+                          Title="Add New Expense" />
+        </div> 
+    </b>
 
     <table class="table table-sm table-bordered mt-1">
         <thead class="table-light">
@@ -244,25 +329,32 @@
     <!-- ================= ACTIONS ================= -->
 
     <div class="mt-3 d-flex">
-
-        @if (PurchaseId != null)
-        {
-            <RadzenButton Text="Delete (Del)"
-                          Icon="delete"
-                          ButtonStyle="ButtonStyle.Danger"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@DeleteClick" />
+        @if (Auth.HasPermission("Purchase.Delete"))
+        { 
+            @if (PurchaseId != null)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
         }
+        
 
         <div class="ms-auto">
-            <RadzenButton Text="Save (Alt+S)"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@Save"
-                          Disabled="@isSaving"
-                          IsBusy="@isSaving"
-                          BusyText="Saving..." />
+            @if (Auth.HasPermission("Purchase.Edit") || Auth.HasPermission("Purchase.Create"))
+            { 
+                <RadzenButton Text="Save (Alt+S)"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@Save"
+                              Disabled="@isSaving"
+                              IsBusy="@isSaving"
+                              BusyText="Saving..." />
+            }
+            
 
             <RadzenButton Text="Cancel (Esc)"
                           ButtonType="ButtonType.Button"
@@ -350,6 +442,72 @@
 
         await InvokeAsync(StateHasChanged);
     }
+    async Task AddVendor()
+    {
+        await DialogService.OpenAsync<AccountDialog>(
+          "Add Account",
+          null,
+          new DialogOptions
+          {
+              Width = "720px",
+              CloseDialogOnEsc = true,
+              Draggable = true,
+              Resizable = false
+          });
+        parties = await PartyApi.GetAccountsAsync();
+
+        if (parties.Count > 0)
+        {
+            parties = parties.Where(p => p.AccountGroupName.ToUpper() == "VENDOR").ToList();
+        }
+        StateHasChanged();
+    }
+    async Task AddProduct()
+    {
+        await DialogService.OpenAsync<ProductDialog>(
+            "Add Product",
+            null,
+            new DialogOptions { Width = "720px", CloseDialogOnEsc = true, Draggable = true, Resizable = false });
+
+
+        products = await ProductApi.GetProductsAsync();
+        StateHasChanged();
+
+    }
+    async Task AddProductGroup()
+    {
+        await DialogService.OpenAsync<ProductGroupDialog>(
+             "Add Product Group",
+             null,
+             new DialogOptions
+             {
+                 Width = "520px",
+                 CloseDialogOnEsc = true,
+                 Draggable = true,
+                 Resizable = false
+             });
+
+        productGroups = await ProductGroupApi.GetGroupsAsync();
+        StateHasChanged();
+
+    }
+
+    async Task AddExpense()
+    {
+        await DialogService.OpenAsync<ExpenseMasterDialog>(
+            "Add Expense",
+            null,
+            new DialogOptions
+            {
+                Width = "720px",
+                CloseDialogOnEsc = true,
+                Draggable = true,
+                Resizable = false
+            });
+
+        expenses = await ExpenseApi.GetPurchaseExpensesAsync();
+        StateHasChanged();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -367,11 +525,9 @@
             }            
         }
     }
-
-
-    void OnGroupChanged(ChangeEventArgs e, PurchaseItemDto row)
+    private void OnGroupChanged(object value, PurchaseItemDto row)
     {
-        if (Guid.TryParse(e.Value?.ToString(), out var groupId))
+        if (Guid.TryParse(value?.ToString(), out var groupId))
         {
             row.ProductGroupId = groupId;
 
@@ -381,6 +537,19 @@
             row.Amount = 0;
         }
     }
+
+    // void OnGroupChanged(ChangeEventArgs e, PurchaseItemDto row)
+    // {
+    //     if (Guid.TryParse(e.Value?.ToString(), out var groupId))
+    //     {
+    //         row.ProductGroupId = groupId;
+
+    //         // Reset product when group changes
+    //         row.ProductId = Guid.Empty;
+    //         row.Rate = 0;
+    //         row.Amount = 0;
+    //     }
+    // }
 
     void OnUnitChanged(ChangeEventArgs e, PurchaseItemDto row)
     {
@@ -405,7 +574,7 @@
     {
         items.Add(new PurchaseItemDto
         {
-            Qty = 1
+
         });
     }
 
@@ -414,9 +583,9 @@
         items.RemoveAt(index);
     }
 
-    void OnProductChanged(ChangeEventArgs e, PurchaseItemDto row)
+    void OnProductChanged(Guid value, PurchaseItemDto row)
     {
-        if (!Guid.TryParse(e.Value?.ToString(), out var productId))
+        if (!Guid.TryParse(value.ToString(), out var productId))
             return;
 
         row.ProductId = productId;
@@ -425,7 +594,11 @@
         if (product != null)
         {
             row.GstPercent = product.GstPercent;
-            row.Rate = product.SalePrice; // optional default
+            row.UnitId= product.UnitId;
+            row.SecondaryUnitId = product.SecondaryUnitId;
+            row.UnitConversionRatio = product.UnitConversionRatio;
+            row.AmountCalculatedOnUnit = product.AmountCalculatedOnUnit;
+            //row.Rate = product.SalePrice; // optional default
         }
 
         Recalculate(row);
@@ -434,22 +607,40 @@
     void OnQtyChanged(ChangeEventArgs e, PurchaseItemDto row)
     {
         if (decimal.TryParse(e.Value?.ToString(), out var qty))
-            row.Qty = qty;
+            row.Qty = Math.Round(qty,2);
 
         Recalculate(row);
     }
+    void OnPrimaryUnitQtyChanged(ChangeEventArgs e, PurchaseItemDto row)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var qty))
+            row.PrimaryUnitQty = Math.Round(qty,2);
+
+        row.Qty = row.PrimaryUnitQty * row.UnitConversionRatio;
+        row.Qty = Math.Round(row.Qty, 2);
+        Recalculate(row);
+    }
+
 
     void OnRateChanged(ChangeEventArgs e, PurchaseItemDto row)
     {
         if (decimal.TryParse(e.Value?.ToString(), out var rate))
-            row.Rate = rate;
+            row.Rate = Math.Round(rate,2);
 
         Recalculate(row);
     }
 
     void Recalculate(PurchaseItemDto row)
     {
-        row.Amount = row.Qty * row.Rate;
+        if (row.AmountCalculatedOnUnit == "Primary")
+        {
+            row.Amount = row.PrimaryUnitQty * row.Rate;
+        }
+        else if (row.AmountCalculatedOnUnit == "Secondary")
+        {
+            row.Amount = row.Qty * row.Rate;
+        }
+        row.Amount = Math.Round(row.Amount);
     }
 
     decimal CalculateExpense(PurchaseExpenseDto e)
@@ -495,7 +686,62 @@
                 dto.Header.BranchId = Auth.CurrentUser.BranchId;
             }
 
-            decimal _totalQty = dto.Items.Sum(x => x.Qty);
+            if (dto.Header.AccountId == Guid.Empty)
+            {
+                ShowError("Please select Vendor");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(dto.Header.PartyInvoiceNo))
+            {
+                ShowError("Please enter Party Invoice No.");
+                return;
+            }
+
+            foreach(var _item in dto.Items)
+            {
+                if (_item.ProductGroupId == Guid.Empty)
+                {
+                    ShowError("Please select Product Group");
+                    return;
+                }
+                else if (_item.ProductId == Guid.Empty)
+                {
+                    ShowError("Please select Product");
+                    return;
+                }
+                else if (_item.UnitId == Guid.Empty)
+                {
+                    ShowError("Primary Unit cannot be blank");
+                    return;
+                }
+                else if (_item.SecondaryUnitId == null || _item.SecondaryUnitId == Guid.Empty)
+                {
+                    ShowError("Secondary Unit cannot be blank");
+                    return;
+                }
+                else if (_item.PrimaryUnitQty <= 0)
+                {
+                    ShowError("Enter Primary Qty");
+                    return;
+                }
+                else if (_item.Rate <= 0)
+                {
+                    ShowError("Enter Rate");
+                    return;
+                }
+                else if (_item.Qty <= 0)
+                {
+                    ShowError("Enter Secondary Qty");
+                    return;
+                }
+                else if (_item.Amount <= 0)
+                {
+                    ShowError("Amount should be greater than zero");
+                    return;
+                }
+            }
+
+            decimal _totalQty = dto.Items.Sum(x => x.PrimaryUnitQty);
             decimal _grossAmount = dto.Items.Sum(x => x.Amount);
 
             foreach (var _expense in dto.Expenses)

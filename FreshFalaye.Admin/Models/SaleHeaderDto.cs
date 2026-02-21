@@ -9,6 +9,7 @@
         public string BillNo { get; set; }
         public string? CustomerMobile { get; set; }
         public string? CustomerName { get; set; }
-        public string PaymentMode { get; set; } = null!;        
+        public string PaymentMode { get; set; } = null!;
+        public string SaleType { get; set; } = "Normal";
     }
 }

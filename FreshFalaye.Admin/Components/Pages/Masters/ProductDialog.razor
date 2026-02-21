@@ -35,12 +35,36 @@
         </div>
 
         <div class="col-6">
-            <RadzenLabel Text="Unit" />
+            <RadzenLabel Text="Primary Unit" />
             <RadzenDropDown Data="@units"
                             TextProperty="UnitName"
                             ValueProperty="UnitId"
                             @bind-Value="model.UnitId"
                             Style="width:100%" />
+        </div>
+        <div class="col-6">
+            <RadzenLabel Text="Secondary Unit" />
+            <RadzenDropDown Data="@units"
+                            TextProperty="UnitName"
+                            ValueProperty="UnitId"
+                            @bind-Value="model.SecondaryUnitId"
+                            Style="width:100%" />
+        </div>
+        <div class="col-6">
+            <RadzenLabel Text="Amount Calculated On" />
+
+            <RadzenRadioButtonList TValue="string"
+                                   @bind-Value="model.AmountCalculatedOnUnit"
+                                   Data="@amountCalculationOptions"
+                                   TextProperty="Text"
+                                   ValueProperty="Value"
+                                   Style="display:flex; gap:20px;" />
+        </div>
+        <div class="col-6">
+            <RadzenLabel Text="Unit Conversion Ratio" />
+            <RadzenNumeric TValue="decimal" @bind-Value="model.UnitConversionRatio"
+                           Style="width:100%"
+                           Format="0.00"/>
         </div>
         <div class="col-6">
             <RadzenLabel Text="MRP" />
@@ -109,27 +133,38 @@
             <RadzenLabel Text="Use Weighing Scale" />
             <RadzenCheckBox @bind-Value="model.UseWeighingScale"/>
         </div>
-
+        <div class="col-6">
+            <RadzenLabel Text="Show In Stock" />
+            <RadzenCheckBox @bind-Value="model.ShowInStock" />
+        </div>
 
     </div>
 
     <div class="mt-3 d-flex">
-
-        @if (ProductId != null)
+        @if (Auth.HasPermission("Masters.Delete"))
         {
-            <RadzenButton Text="Delete (Del)"
-                          Icon="delete"
-                          ButtonStyle="ButtonStyle.Danger"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@DeleteClick" />
+            @if (ProductId != null)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
+
         }
+        
 
         <div class="ms-auto">
-            <RadzenButton Text="Save (Alt+S)"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@SaveClick" />
+            @if (Auth.HasPermission("Masters.Edit") || Auth.HasPermission("Masters.Create"))
+            {
+                <RadzenButton Text="Save (Alt+S)"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@SaveClick" />
+            }
+            
 
             <RadzenButton Text="Cancel (Esc)"
                           ButtonType="ButtonType.Button"
@@ -145,7 +180,18 @@
 
     [Parameter] public Guid? ProductId { get; set; }
 
-    ProductDto model = new();
+    List<RadioOption> amountCalculationOptions = new()
+    {
+        new RadioOption { Text = "Primary Unit", Value = "Primary" },
+        new RadioOption { Text = "Secondary Unit", Value = "Secondary" }
+    };
+
+
+    ProductDto model = new()
+    {
+        AmountCalculatedOnUnit= "Primary",
+        ShowInStock = true
+    };
 
     RadzenTextBox nameBox;
     DotNetObjectReference<ProductDialog>? objRef;
@@ -297,6 +343,11 @@
                 ShowError("Please select Unit");
                 return;
             }
+            else if (model.SecondaryUnitId != Guid.Empty && model.UnitConversionRatio <= 0)
+            {
+                ShowError("Please enter Unit conversion ratio");
+                return;
+            }
             else if (model.Mrp <= 0)
             {
                 ShowError("Please enter MRP");
@@ -313,6 +364,13 @@
                 return;
             }
 
+
+            if(model.SecondaryUnitId==null || model.SecondaryUnitId == Guid.Empty)
+            {
+                model.SecondaryUnitId = model.UnitId;
+                model.UnitConversionRatio = 1;
+            }
+
             model.ProductName = model.ProductName.Trim();
             HttpResponseMessage response;
             if (ProductId == null)
@@ -320,12 +378,12 @@
                 response = await ProductApi.CreateAsync(model);
 
                 // reload product so ProductId is available for image upload
-                var latest = (await ProductApi.GetProductsAsync())
-                                .Where(x => x.ProductName == model.ProductName)
-                                .First();
+                // var latest = (await ProductApi.GetProductsAsync())
+                //                 .Where(x => x.ProductName == model.ProductName)
+                //                 .First();
 
-                ProductId = latest.ProductId;
-                model = latest;
+                // ProductId = latest.ProductId;
+                // model = latest;
                 await HandleApiResponse(response);
 
                 StateHasChanged();
@@ -428,5 +486,11 @@
     class ImageUploadResult
     {
         public string? ImagePath { get; set; }
+    }
+
+    public class RadioOption
+    {
+        public string Text { get; set; }
+        public string Value { get; set; }
     }
 }

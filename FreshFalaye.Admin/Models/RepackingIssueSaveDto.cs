@@ -16,7 +16,7 @@
     public class RepackingIssueItemDto
     {
         public Guid ProductId { get; set; }
-
+        public Guid UnitId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public string ProductGroupName { get; set; } = string.Empty;
         public string ProductUnitName { get; set; } = string.Empty;
@@ -26,6 +26,7 @@
         public decimal BalanceQty { get; set; }
 
         public decimal Qty { get; set; }
+        public decimal SecondaryQty { get; set; }
 
         public decimal Rate { get; set; }
         public DateTime PurchaseDate { get; set; }

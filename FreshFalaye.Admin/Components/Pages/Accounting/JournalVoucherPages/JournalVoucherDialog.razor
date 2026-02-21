@@ -165,22 +165,29 @@
     <hr />
 
     <div class="mt-3 d-flex">
-
-        @if (VoucherId != null)
-        {
-            <RadzenButton Text="Delete (Del)"
-                          Icon="delete"
-                          ButtonStyle="ButtonStyle.Danger"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@DeleteClick" />
+        @if (Auth.HasPermission("Vouchers.Delete"))
+        { 
+            @if (VoucherId != null)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
         }
+        
 
         <div class="ms-auto">
-            <RadzenButton Text="Save (Alt+S)"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@Save" />
+            @if (Auth.HasPermission("Vouchers.Edit") || Auth.HasPermission("Vouchers.Create"))
+            {
+                <RadzenButton Text="Save (Alt+S)"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@Save" />
+            }
+            
 
             <RadzenButton Text="Cancel (Esc)"
                           ButtonType="ButtonType.Button"

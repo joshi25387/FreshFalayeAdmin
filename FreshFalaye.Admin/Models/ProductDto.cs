@@ -10,10 +10,13 @@
 
         public Guid UnitId { get; set; }
         public string? UnitName { get; set; }
+        public Guid? SecondaryUnitId { get; set; }
+        public string? SecondaryUnitName { get; set; }
+        public decimal UnitConversionRatio { get; set; }
+        public string AmountCalculatedOnUnit { get; set; }
         public decimal MinimumStock { get; set; }
 
         public string ProductName { get; set; } = null!;
-
         public decimal Mrp { get; set; }
         public decimal Discount { get; set; }
         public decimal SalePrice { get; set; }
@@ -24,6 +27,7 @@
         public string? ImagePath { get; set; }
         public bool IsActive { get; set; } = true;
         public bool UseWeighingScale { get; set; } = true;
+        public bool ShowInStock { get; set; } = true;
     }
 
 }

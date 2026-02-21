@@ -21,12 +21,16 @@
 
         <div class="d-flex mb-1">
             <b class="me-auto">Purchase Register</b>
+            @if (Auth.HasPermission("Purchase.Create"))
+            {
+                <RadzenButton Text="Add (Alt+A)"
+                              Icon="add"
+                              AccessKey="A"
+                              Size="ButtonSize.Small"
+                              Click="@AddPurchase" />
 
-            <RadzenButton Text="Add (Alt+A)"
-                          Icon="add"
-                          AccessKey="A"
-                          Size="ButtonSize.Small"
-                          Click="@AddPurchase" />
+            }
+            
         </div>
 
         <RadzenDataGrid Data="@purchases"

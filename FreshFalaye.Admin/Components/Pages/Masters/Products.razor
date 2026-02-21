@@ -21,13 +21,16 @@
 
         <div class="d-flex mb-1">
             <b class="me-auto">Product Master</b>
-
-            <RadzenButton Text="Add (Alt+A)"
-                          Icon="add"
-                          ButtonType="ButtonType.Button"
-                          AccessKey="A"
-                          Size="ButtonSize.Small"
-                          Click="@AddProduct" />
+            @if (Auth.HasPermission("Masters.Create"))
+            {
+                <RadzenButton Text="Add (Alt+A)"
+                              Icon="add"
+                              ButtonType="ButtonType.Button"
+                              AccessKey="A"
+                              Size="ButtonSize.Small"
+                              Click="@AddProduct" />
+            }
+            
         </div>
 
         <RadzenDataGrid Data="@products"

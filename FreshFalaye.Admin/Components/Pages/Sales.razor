@@ -22,11 +22,16 @@
         <div class="d-flex mb-1">
             <b class="me-auto">Sale Register</b>
 
-            <RadzenButton Text="Add (Alt+A)"
-                          Icon="add"
-                          AccessKey="A"
-                          Size="ButtonSize.Small"
-                          Click="@AddSale" />
+            @if (Auth.HasPermission("Sale.Create"))
+            {
+                <RadzenButton Text="Add (Alt+A)"
+                              Icon="add"
+                              AccessKey="A"
+                              Size="ButtonSize.Small"
+                              Click="@AddSale" />
+
+            }
+            
         </div>
 
         <RadzenDataGrid Data="@sales"

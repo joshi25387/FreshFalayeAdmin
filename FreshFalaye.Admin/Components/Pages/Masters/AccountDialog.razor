@@ -21,7 +21,8 @@
                            Style="width:100%"
                            @ref="codeBox" />
         </div>
-        <div class="col-2 d-flex align-items-end">
+        <div class="col-4">
+            <RadzenLabel Text="Account Group" />
             <RadzenDropDown Data="@groups"
                             TextProperty="GroupName"
                             ValueProperty="Id"
@@ -29,7 +30,7 @@
                             Style="width:100%" />
         </div>
 
-        <div class="col-8">
+        <div class="col-6">
             <RadzenLabel Text="Account Name" />
             <RadzenTextBox @bind-Value="model.AccountName"
                            Style="width:100%" />
@@ -89,22 +90,30 @@
     </div>
 
     <div class="mt-3 d-flex">
-
-        @if (AccountId != null)
+        @if (Auth.HasPermission("Masters.Delete"))
         {
-            <RadzenButton Text="Delete (Del)"
-                          Icon="delete"
-                          ButtonStyle="ButtonStyle.Danger"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@DeleteClick" />
+            @if (AccountId != null)
+            {
+                <RadzenButton Text="Delete (Del)"
+                              Icon="delete"
+                              ButtonStyle="ButtonStyle.Danger"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@DeleteClick" />
+            }
+
         }
+        
 
         <div class="ms-auto">
-            <RadzenButton Text="Save (Alt+S)"
-                          ButtonType="ButtonType.Button"
-                          Size="ButtonSize.Small"
-                          Click="@SaveClick" />
+            @if (Auth.HasPermission("Masters.Edit") || Auth.HasPermission("Masters.Create"))
+            {
+                <RadzenButton Text="Save (Alt+S)"
+                              ButtonType="ButtonType.Button"
+                              Size="ButtonSize.Small"
+                              Click="@SaveClick" />
+            }
+            
 
             <RadzenButton Text="Cancel (Esc)"
                           ButtonType="ButtonType.Button"

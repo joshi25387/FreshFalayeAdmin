@@ -7,6 +7,7 @@
         public Guid UnitId { get; set; }
         public string ProductName { get; set; }
         public string UnitCode { get; set; }
+        public List<UnitDto> AvailableUnits { get; set; }
         public decimal Qty { get; set; }
         public decimal Mrp { get; set; }
         public decimal Discount { get; set; }

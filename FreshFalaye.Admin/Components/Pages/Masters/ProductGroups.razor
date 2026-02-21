@@ -24,13 +24,16 @@
 
             <div class="d-flex mb-1">
                 <b class="me-auto">Product Groups</b>
-
-                <RadzenButton Text="Add (Alt+A)"
-                              Icon="add"
-                              ButtonType="ButtonType.Button"
-                              AccessKey="A"
-                              Size="ButtonSize.Small"
-                              Click="@AddGroup" />
+                @if (Auth.HasPermission("Masters.Create"))
+                {
+                    <RadzenButton Text="Add (Alt+A)"
+                                  Icon="add"
+                                  ButtonType="ButtonType.Button"
+                                  AccessKey="A"
+                                  Size="ButtonSize.Small"
+                                  Click="@AddGroup" />
+                }
+                
             </div>
 
             <RadzenDataGrid Data="@groups"
