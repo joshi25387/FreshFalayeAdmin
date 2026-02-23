@@ -20,7 +20,7 @@
         public string ProductName { get; set; } = string.Empty;
         public string ProductGroupName { get; set; } = string.Empty;
         public string ProductUnitName { get; set; } = string.Empty;
-
+        public decimal UnitConversionRatio { get; set; }
         public Guid LotNo { get; set; }
         
         public decimal BalanceQty { get; set; }

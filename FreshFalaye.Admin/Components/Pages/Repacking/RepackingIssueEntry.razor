@@ -280,8 +280,56 @@
                 Qty = x.Qty,
                 OriginalQty = x.Qty,
                 Rate = x.Rate,
-                BalanceQty = x.BalanceQty
+                BalanceQty = x.BalanceQty,
+                UnitId = x.UnitId,
+                UnitConversionRatio = x.UnitConversionRatio
             }).ToList();
+
+            foreach (var item in issueItems)
+            {
+                var product = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+                if (product == null) continue;
+
+                item.PrimaryUnitId = product.UnitId;
+                item.SecondaryUnitId = product.SecondaryUnitId;
+
+                var availableUnits = new List<UnitDto>();
+
+                if (product.UnitId == product.SecondaryUnitId)
+                {
+                    var u = units.FirstOrDefault(x => x.UnitId == product.UnitId);
+                    if (u != null)
+                    {
+                        availableUnits.Add(u);
+                        item.PrimaryUnitName = u.UnitCode;
+                        item.SecondaryUnitName = u.UnitCode;
+                    }
+                }
+                else
+                {
+                    var pu = units.FirstOrDefault(x => x.UnitId == product.UnitId);
+                    var su = units.FirstOrDefault(x => x.UnitId == product.SecondaryUnitId);
+
+                    if (pu != null)
+                    {
+                        availableUnits.Add(pu);
+                        item.PrimaryUnitName = pu.UnitCode;
+                    }
+                    if (su != null)
+                    {
+                        availableUnits.Add(su);
+                        item.SecondaryUnitName = su.UnitCode;
+                    }
+                }
+
+                item.AvailableUnits = availableUnits;
+
+                
+
+                // recompute max allowed qty
+                item.MaxQtyAllowed = Math.Round(item.BalanceQty / product.UnitConversionRatio, 2);
+            }
+
 
             originalIssueQty = model.Items
                 .GroupBy(x => (x.ProductId, x.LotNo))
