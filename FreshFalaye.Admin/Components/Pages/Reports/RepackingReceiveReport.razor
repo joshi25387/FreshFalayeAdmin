@@ -1,0 +1,230 @@
+﻿@page "/reports/repacking-receive"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Components.Reports
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+@inject RepackingReceiveReportApiService Api
+@inject AccountApiService PartyApi
+@inject ProductApiService ProductApi
+@inject ProductGroupApiService GroupApi
+@implements IDisposable
+
+
+<RadzenCard Style="height:85vh; padding:10px;">
+    <div class="d-flex mb-1">
+        <b class="me-auto">Repacking Receive Report</b>
+    </div>
+
+    <div style="display:flex; height:100%; gap:15px;">
+
+        <!-- LEFT: Filters Panel -->
+        <div style="width:400px; background:#f8f9fa; padding:15px; border-radius:6px; overflow-y:auto;">
+
+            <RadzenLabel Text="From Date" />
+            <RadzenDatePicker @bind-Value="fromDate" ShowTime="false" DateFormat="dd-MM-yyyy"
+                              Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="To Date" />
+            <RadzenDatePicker @bind-Value="toDate" ShowTime="false" DateFormat="dd-MM-yyyy"
+                              Style="width:100%; margin-bottom:10px;" />
+
+            @*  <RadzenLabel Text="Party" />
+            <RadzenDropDown Data="@parties"
+                            TextProperty="AccountName"
+                            ValueProperty="Id"
+                            AllowFiltering="true"
+                            AllowClear="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            @bind-Value="partyId"
+                            Style="width:100%" /> *@
+
+            <RadzenLabel Text="Item Group" />
+            <RadzenDropDown Data="@productGroups"
+                            TextProperty="GroupName"
+                            ValueProperty="ProductGroupId"
+                            @bind-Value="selectedItemGroupIds"
+                            Multiple="true"
+                            Change="OnProductGroupChanged"
+                            AllowFiltering="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            Chips="true"
+                            AllowClear="true"
+                            Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="Item" />
+            <RadzenDropDown Data="@products"
+                            TextProperty="ProductName"
+                            ValueProperty="ProductId"
+                            @bind-Value="selectedItemIds"
+                            Multiple="true"
+                            AllowFiltering="true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            Chips="true"
+                            AllowClear="true"
+                            Style="width:100%; margin-bottom:10px;" />
+
+            <div style="margin-top:10px;">
+                <RadzenCheckBox @bind-Value="pendingToReceive" />
+                <RadzenLabel Text="Pending to Receive"
+                             Style="margin-left:5px;" />
+            </div>
+
+            <RadzenButton Text="View Report"
+                          Icon="search"
+                          Click="LoadReport"
+                          Style="width:100%; margin-top:20px;"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Disabled="@isLoading"
+                          IsBusy="@isLoading"
+                          BusyText="Loading..." />
+
+
+
+
+        </div>
+
+        <!-- RIGHT: Report Viewer -->
+        <div style="flex:1; overflow:hidden;">
+            <ReportViewer @ref="viewer" />
+        </div>
+
+    </div>
+
+</RadzenCard>
+
+
+@code {
+
+    private ReportViewer? viewer;
+
+    bool isLoading = false;
+
+    DateTime? fromDate = DateTime.Today.AddMonths(-1);
+    DateTime? toDate = DateTime.Today;
+    Guid? partyId = null;
+    //List<AccountDto> parties = new();
+    bool dataLoaded;
+    bool pendingToReceive = false;
+    List<Guid> selectedItemGroupIds = new();
+    List<Guid> selectedItemIds = new();
+
+
+    List<ProductGroupDto> productGroups = new();
+    List<ProductDto> products = new();       // filtered list
+    List<ProductDto> allProducts = new();    // master list
+
+    DotNetObjectReference<RepackingReceiveReport>? objRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+        //parties = await PartyApi.GetAccountsAsync();
+        productGroups = await GroupApi.GetGroupsAsync();
+        allProducts = await ProductApi.GetProductsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task LoadReport()
+    {
+
+        if (isLoading)
+            return;
+
+        try
+        {
+            isLoading = true;
+            var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+            var request = new RepackingReceiveReportRequest
+            {
+                BranchId = branchId,
+                FromDate = fromDate!.Value.StartOfDay(),
+                ToDate = toDate!.Value.EndOfDay(),
+                ItemGroupIds = selectedItemGroupIds.Any() ? selectedItemGroupIds : null,
+                ItemIds = selectedItemIds.Any() ? selectedItemIds : null,
+                PendingToReceive = pendingToReceive
+            };
+
+            var bytes = await Api.GetSummaryPdfAsync(request);
+
+            await viewer!.LoadFromBytesAsync(bytes);
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+
+
+    }
+
+    private async Task OnProductGroupChanged(object value)
+    {
+        var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+        // Clear selected products
+        selectedItemIds.Clear();
+
+        // If no group selected → load all products
+        if (selectedItemGroupIds == null || !selectedItemGroupIds.Any())
+        {
+            products = await ProductApi.GetProductsAsync();
+        }
+        else
+        {
+            products = allProducts
+            .Where(p => selectedItemGroupIds.Contains(p.ProductGroupId))
+            .ToList();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        }
+    }
+
+}

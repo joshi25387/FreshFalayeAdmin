@@ -140,3 +140,44 @@ h1:focus {
     background-color: #adb5bd;
     border-radius: 3px;
 }
+
+
+
+/* Account Header */
+.ledger-account-header > td {
+    background-color: #e3f2fd !important;
+    font-weight: 600;
+}
+
+/* Opening Row */
+.ledger-opening-row > td {
+    background-color: #f9fafb !important;
+}
+
+/* Total Row */
+.ledger-total-row > td {
+    background-color: #ede7f6 !important;
+    font-weight: 600;
+    border-top: 2px solid #5c6bc0 !important;
+}
+
+.ledger-selected > td {
+    background-color: #fff59d !important; /* soft yellow */
+}
+
+
+.rz-state-highlight.rz-state-hover > td {
+    background-color: #fff59d !important;
+}
+
+.rz-state-highlight > td {
+    background-color: #ffeb3b !important; /* stronger yellow */
+    font-weight: 600;
+}
+
+
+/* Remove pink focus color */
+.rz-state-focused > td {
+    background-color: transparent !important;
+}
+

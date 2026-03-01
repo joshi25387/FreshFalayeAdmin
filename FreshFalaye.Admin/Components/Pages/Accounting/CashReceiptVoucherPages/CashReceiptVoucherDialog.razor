@@ -374,7 +374,7 @@
             {
                 // reload grid / close dialog / reset form
                 StateHasChanged();
-                DialogService.Close();
+                DialogService.Close(true);
             }
         }
         catch (ApiException ex)

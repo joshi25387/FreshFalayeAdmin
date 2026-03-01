@@ -863,7 +863,9 @@
 
             await HandleApiResponse(response);
 
-            Nav.NavigateTo("/stock/sales");
+            DialogService.Close(true);
+
+            //Nav.NavigateTo("/stock/sales");
         }
         catch (ApiException ex)
         {

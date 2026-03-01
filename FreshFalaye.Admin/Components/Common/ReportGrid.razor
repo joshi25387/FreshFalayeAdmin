@@ -1,0 +1,205 @@
+﻿@typeparam TItem
+@inject IJSRuntime JS
+
+<RadzenDataGrid TItem="TItem"
+                @ref="grid"
+                Data="@Data"
+                IsLoading="@IsLoading"
+                SelectionMode="DataGridSelectionMode.Single"
+                RowSelect="@OnRowSelectInternal"
+                AllowPaging="true"
+                PageSize="@PageSize"
+                AllowFiltering="@AllowFiltering"
+                FilterMode="FilterMode.Simple"
+                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                AllowSorting="@AllowSorting"
+                AllowGrouping="false"
+                RowRender="@OnRowRenderInternal"
+                Style="height:100%;">
+
+    <Columns>
+        @ChildContent
+    </Columns>
+
+</RadzenDataGrid>
+
+@code {
+
+    private RadzenDataGrid<TItem>? grid;
+    private TItem? selectedRow;
+    private int selectedIndex = -1;
+    private DotNetObjectReference<ReportGrid<TItem>>? objRef;
+
+    /* ================= PARAMETERS ================= */
+
+    [Parameter] public IEnumerable<TItem>? Data { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+
+    [Parameter] public int PageSize { get; set; } = 10;
+    [Parameter] public bool AllowFiltering { get; set; } = true;
+    [Parameter] public bool AllowSorting { get; set; } = false;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    public int? CurrentPage => grid?.CurrentPage;
+
+    // Row styling hook
+    [Parameter] public Func<TItem, string>? RowClassSelector { get; set; }
+
+    // Enter key action
+    [Parameter] public EventCallback<TItem> OnEnterPressed { get; set; }
+
+    
+
+    /* ================= LIFECYCLE ================= */
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerLedgerKeyboard", objRef);
+        }
+    }
+    public async Task GoToPage(int pageIndex)
+    {
+        if (grid == null)
+            return;
+
+        await grid.GoToPage(pageIndex);
+    }
+
+    public async Task SelectRowByIndex(int index)
+    {
+        if (Data == null || grid == null)
+            return;
+
+        var list = Data.ToList();
+        if (index < 0 || index >= list.Count)
+            return;
+
+        selectedIndex = index;
+        selectedRow = list[index];
+
+        int targetPage = index / grid.PageSize;
+
+        if (grid.CurrentPage != targetPage)
+            await grid.GoToPage(targetPage);
+
+        await grid.SelectRow(selectedRow);
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
+
+    /* ================= ROW SELECTION ================= */
+
+    private void OnRowSelectInternal(TItem row)
+    {
+        selectedRow = row;
+        selectedIndex = Data?.ToList().IndexOf(row) ?? -1;
+    }
+
+    /* ================= KEYBOARD ================= */
+
+    [JSInvokable]
+    public async Task MoveSelection(string direction)
+    {
+        if (Data == null || grid == null)
+            return;
+
+        var list = Data.ToList();
+        if (!list.Any())
+            return;
+
+        if (selectedRow == null)
+        {
+            selectedRow = list.First();
+            selectedIndex = 0;
+            await grid.SelectRow(selectedRow);
+            return;
+        }
+
+        selectedIndex = list.IndexOf(selectedRow);
+
+        int totalCount = list.Count;
+        int pageSize = grid.PageSize;
+        int currentPage = grid.CurrentPage;
+
+        if (direction == "down" && selectedIndex < totalCount - 1)
+        {
+            selectedIndex++;
+            if (selectedIndex >= (currentPage + 1) * pageSize)
+                await grid.GoToPage(currentPage + 1);
+        }
+
+        if (direction == "up" && selectedIndex > 0)
+        {
+            selectedIndex--;
+            if (selectedIndex < currentPage * pageSize)
+                await grid.GoToPage(currentPage - 1);
+        }
+
+        selectedRow = list[selectedIndex];
+
+        await InvokeAsync(StateHasChanged);
+        await grid.SelectRow(selectedRow);
+    }
+
+    [JSInvokable]
+    public async Task OpenSelectedRow()
+    {
+        if (selectedRow == null)
+            return;
+
+        if (OnEnterPressed.HasDelegate)
+            await OnEnterPressed.InvokeAsync(selectedRow);
+    }
+
+    /* ================= PROGRAMMATIC SELECTION ================= */
+
+    public async Task SelectRowByPredicate(Func<TItem, bool> predicate)
+    {
+        if (Data == null || grid == null)
+            return;
+
+        var list = Data.ToList();
+        int index = list.FindIndex(x => predicate(x));
+
+        if (index == -1)
+            return;
+
+        selectedIndex = index;
+        selectedRow = list[index];
+
+        int targetPage = index / grid.PageSize;
+
+        if (grid.CurrentPage != targetPage)
+            await grid.GoToPage(targetPage);
+
+        await grid.SelectRow(selectedRow);
+    }
+
+    /* ================= ROW STYLING ================= */
+
+    private void OnRowRenderInternal(RowRenderEventArgs<TItem> args)
+    {
+        if (RowClassSelector == null)
+            return;
+
+        var css = RowClassSelector(args.Data);
+
+        if (string.IsNullOrWhiteSpace(css))
+            return;
+
+        if (args.Attributes.TryGetValue("class", out var existingClass))
+        {
+            args.Attributes["class"] = $"{existingClass} {css}";
+        }
+        else
+        {
+            args.Attributes["class"] = css;
+        }
+    }
+}

@@ -7,7 +7,7 @@ namespace FreshFalaye.Admin.Services
         public LedgerReportApiService(HttpClient http) : base(http) { }
 
         public async Task<byte[]> GetLedgerReportAsync(
-           LedgerReportDto request)
+           LedgerReportRequestDto request)
         {
             var response = await _http.PostAsJsonAsync(
                 "api/reports/ledger/ledger-report",
@@ -16,6 +16,16 @@ namespace FreshFalaye.Admin.Services
             response.EnsureSuccessStatusCode();
 
             return await response.Content.ReadAsByteArrayAsync();
+        }
+
+        public async Task<List<LedgerReportDto>> GetLedgerGridAsync(
+           LedgerReportRequestDto request)
+        {
+            var response = await _http.PostAsJsonAsync(
+                "api/reports/ledger/ledger-report-data",
+                request);
+
+            return await ReadResponse<List<LedgerReportDto>>(response);            
         }
     }
 }

@@ -1,0 +1,168 @@
+﻿@page "/reports/purchase-summary"
+@rendermode InteractiveServer
+@layout MainLayout
+
+@using FreshFalaye.Admin.Components.Reports
+@using FreshFalaye.Admin.Models
+@using FreshFalaye.Admin.Services
+@inject IJSRuntime JS
+@inject AdminAuthService Auth
+@inject PurchaseReportApiService Api
+@inject AccountApiService PartyApi
+
+@implements IDisposable
+
+
+<RadzenCard Style="height:85vh; padding:10px;">
+    <div class="d-flex mb-1">
+        <b class="me-auto">Purchase Summary Report</b>
+    </div>
+
+    <div style="display:flex; height:100%; gap:15px;">
+
+        <!-- LEFT: Filters Panel -->
+        <div style="width:400px; background:#f8f9fa; padding:15px; border-radius:6px; overflow-y:auto;">
+
+            <RadzenLabel Text="From Date" />
+            <RadzenDatePicker @bind-Value="fromDate" ShowTime="false" DateFormat="dd-MM-yyyy"
+                              Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="To Date" />
+            <RadzenDatePicker @bind-Value="toDate" ShowTime="false" DateFormat="dd-MM-yyyy"
+                              Style="width:100%; margin-bottom:10px;" />
+
+            <RadzenLabel Text="Party" />
+            <RadzenDropDown Data="@parties"
+                            TextProperty="AccountName"
+                            ValueProperty="Id"
+                            AllowFiltering="true"
+                            AllowClear = "true"
+                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                            @bind-Value="partyId"
+                            Style="width:100%" />           
+
+            <RadzenButton Text="View Report"
+                          Icon="search"
+                          Click="LoadReport"
+                          Style="width:100%; margin-top:20px;"
+                          ButtonStyle="ButtonStyle.Primary"
+                          Disabled="@isLoading"
+                          IsBusy="@isLoading"
+                          BusyText="Loading..." />
+
+
+
+
+        </div>
+
+        <!-- RIGHT: Report Viewer -->
+        <div style="flex:1; overflow:hidden;">
+            <ReportViewer @ref="viewer" />
+        </div>
+
+    </div>
+
+</RadzenCard>
+
+
+@code {
+
+    private ReportViewer? viewer;
+
+    bool isLoading = false;
+
+    DateTime? fromDate = DateTime.Today.AddMonths(-1);
+    DateTime? toDate = DateTime.Today;
+    Guid? partyId = null;
+    List<AccountDto> parties = new();   
+    bool dataLoaded;
+
+    List<ProductGroupDto> productGroups = new();
+    List<ProductDto> products = new();       // filtered list
+    List<ProductDto> allProducts = new();    // master list
+
+    DotNetObjectReference<PurchaseSummary>? objRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.OnChange += HandleAuthChanged;
+    }
+
+    void HandleAuthChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        });
+    }
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChanged;
+        objRef?.Dispose();
+    }
+
+
+
+    /* ---------------- Data ---------------- */
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+        parties = await PartyApi.GetAccountsAsync();        
+        await InvokeAsync(StateHasChanged);
+    }
+
+    async Task LoadReport()
+    {
+
+        if (isLoading)
+            return;
+
+        try
+        {
+            isLoading = true;
+            var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
+
+            var request = new PurchaseSummaryRequest
+            {
+                BranchId = branchId,
+                FromDate = fromDate!.Value.StartOfDay(),
+                ToDate = toDate!.Value.EndOfDay(),
+                PartyId = partyId,                             
+            };
+
+            var bytes = await Api.GetSummaryPdfAsync(request);
+
+            await viewer!.LoadFromBytesAsync(bytes);
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+
+
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
+
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        }
+    }
+
+}

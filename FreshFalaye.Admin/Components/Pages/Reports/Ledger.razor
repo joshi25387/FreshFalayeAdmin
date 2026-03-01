@@ -1,121 +1,234 @@
 ﻿@page "/reports/ledger"
+@using FreshFalaye.Admin.Components.Pages.Accounting.JournalVoucherPages
+@using FreshFalaye.Admin.Components.Common
 @rendermode InteractiveServer
 @layout MainLayout
 
-@using FreshFalaye.Admin.Components.Reports
-@using FreshFalaye.Admin.Models
-@using FreshFalaye.Admin.Services
 @inject IJSRuntime JS
 @inject AdminAuthService Auth
 @inject LedgerReportApiService Api
 @inject AccountApiService AccountApi
 @inject AccountGroupApiService AccountGroupApi
-@implements IDisposable
+@inject DialogService DialogService
 
+<RadzenCard Style="height:85vh; padding:10px; display:flex; flex-direction:column;">
 
-<RadzenCard Style="height:85vh; padding:10px;">
     <div class="d-flex mb-1">
         <b class="me-auto">Ledger Report</b>
     </div>
 
-    <div style="display:flex; height:100%; gap:15px;">
+    <!-- FILTER SECTION -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap;">
 
-        <!-- LEFT: Filters Panel -->
-        <div style="width:400px; background:#f8f9fa; padding:15px; border-radius:6px; overflow-y:auto;">
+        <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:flex-end;">
 
-            <RadzenLabel Text="From Date" />
-            <RadzenDatePicker @bind-Value="fromDate" ShowTime="false" DateFormat="dd-MM-yyyy"
-                              Style="width:100%; margin-bottom:10px;" />
-
-            <RadzenLabel Text="To Date" />
-            <RadzenDatePicker @bind-Value="toDate" ShowTime="false" DateFormat="dd-MM-yyyy"
-                              Style="width:100%; margin-bottom:10px;" />
-
-            <RadzenLabel Text="Account Group" />
-            <RadzenDropDown Data="@groups"
-                            TextProperty="GroupName"
-                            ValueProperty="Id"
-                            @bind-Value="selectedAccountGroupIds"
-                            Multiple="true"
-                            Change="OnAccountGroupChanged"
-                            AllowFiltering="true"
-                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                            Chips="true"
-                            AllowClear="true"
-                            Style="width:100%; margin-bottom:10px;" />
-
-            <RadzenLabel Text="Account" />
-            <RadzenDropDown Data="@accounts"
-                            TextProperty="AccountName"
-                            ValueProperty="Id"
-                            @bind-Value="selectedAccountIds"
-                            Multiple="true"
-                            AllowFiltering="true"
-                            FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                            Chips="true"
-                            AllowClear="true"
-                            Style="width:100%; margin-bottom:10px;" />
-
-            <div style="margin-top:10px;">
-                <RadzenCheckBox @bind-Value="onSeparatePage" />
-                <RadzenLabel Text="On Separate Page"
-                             Style="margin-left:5px;" />
+            <div style="width:150px;">
+                <RadzenLabel Text="From" />
+                <RadzenDatePicker @bind-Value="fromDate"
+                                  DateFormat="dd-MM-yyyy"
+                                  Style="width:100%;" />
             </div>
 
-            @*  <RadzenButton Text="View Report"
-                          Icon="search"
-                          Click="LoadReport"
-                          Style="width:100%; margin-top:20px;"
-                          ButtonStyle="ButtonStyle.Primary" /> *@
+            <div style="width:150px;">
+                <RadzenLabel Text="To" />
+                <RadzenDatePicker @bind-Value="toDate"
+                                  DateFormat="dd-MM-yyyy"
+                                  Style="width:100%;" />
+            </div>
 
+            <div style="width:300px;">
+                <RadzenLabel Text="Account Group" />
+                <RadzenDropDown Data="@groups"
+                                TextProperty="GroupName"
+                                ValueProperty="Id"
+                                @bind-Value="selectedAccountGroupIds"
+                                Multiple="true"
+                                Change="OnAccountGroupChanged"
+                                AllowFiltering="true"
+                                Chips="true"
+                                AllowClear="true"
+                                Style="width:100%;" />
+            </div>
 
-            <RadzenButton Text="View Report"
+            <div style="width:300px;">
+                <RadzenLabel Text="Account" />
+                <RadzenDropDown Data="@accounts"
+                                TextProperty="AccountName"
+                                ValueProperty="Id"
+                                @bind-Value="selectedAccountIds"
+                                Multiple="true"
+                                AllowFiltering="true"
+                                Chips="true"
+                                AllowClear="true"
+                                Style="width:100%;" />
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px;">
+                <RadzenCheckBox @bind-Value="onSeparatePage" />
+                <RadzenLabel Text="Separate Page" />
+            </div>
+
+        </div>
+
+        <div style="display:flex; gap:8px;">
+            <RadzenButton Text="Load"
                           Icon="search"
-                          Click="LoadReport"
-                          Style="width:100%; margin-top:20px;"
+                          Size="ButtonSize.Small"
+                          Click="LoadLedgerGrid"
                           ButtonStyle="ButtonStyle.Primary"
                           Disabled="@isLoading"
                           IsBusy="@isLoading"
                           BusyText="Loading..." />
 
-
-
-
+            <RadzenButton Text="PDF"
+                          Icon="picture_as_pdf"
+                          Size="ButtonSize.Small"
+                          Click="LoadPdf"
+                          ButtonStyle="ButtonStyle.Secondary" />
         </div>
+    </div>
 
-        <!-- RIGHT: Report Viewer -->
-        <div style="flex:1; overflow:hidden;">
-            <ReportViewer @ref="viewer" />
-        </div>
+    <!-- GRID -->
+    <div style="flex:1; margin-top:15px; overflow:hidden;">
+
+        <ReportGrid TItem="LedgerReportDto"
+                    @ref="reportGrid"
+                    Data="@ledgerData"
+                    IsLoading="@isLoading"
+                    PageSize="10"
+                    AllowFiltering="true"
+                    AllowSorting="false"
+                    RowClassSelector="GetLedgerRowClass"
+                    OnEnterPressed="NavigateToVoucher">
+
+            <ChildContent>
+
+                <RadzenDataGridColumn TItem="LedgerReportDto"
+                                      Property="EntryDate"
+                                      Title="Date"
+                                      Width="120px">
+                    <Template Context="row">
+                        @if (!row.IsAccountHeader)
+                        {
+                            @row.EntryDate?.ToString("dd-MM-yyyy")
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="LedgerReportDto"
+                                      Property="Particulars"
+                                      Title="Particulars">
+                    <Template Context="row">
+                        @if (row.IsAccountHeader)
+                        {
+                            <div style="font-weight:bold; font-size:15px;">
+                                @row.AccountName
+                            </div>
+                        }
+                        else
+                        {
+                            @row.Particulars
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="LedgerReportDto"
+                                      Property="Debit"
+                                      Title="Debit"
+                                      Width="120px"
+                                      Filterable="false"
+                                      TextAlign="TextAlign.Right">
+                    <Template Context="row">
+                        @if (!row.IsAccountHeader)
+                        {
+                            @row.Debit.ToString("N2")
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="LedgerReportDto"
+                                      Property="Credit"
+                                      Title="Credit"
+                                      Width="120px"
+                                      Filterable="false"
+                                      TextAlign="TextAlign.Right">
+                    <Template Context="row">
+                        @if (!row.IsAccountHeader)
+                        {
+                            @row.Credit.ToString("N2")
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="LedgerReportDto"
+                                      Property="RunningBalance"
+                                      Title="Balance"
+                                      Width="140px"
+                                      Filterable="false"
+                                      TextAlign="TextAlign.Right">
+                    <Template Context="row">
+                        @if (!row.IsAccountHeader)
+                        {
+                            @(row.RunningBalance.ToString("N2") + (row.IsDebit ? " Dr" : " Cr"))
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+
+            </ChildContent>
+
+        </ReportGrid>
 
     </div>
 
 </RadzenCard>
 
-
 @code {
 
-    private ReportViewer? viewer;
-
-    bool isLoading = false;
+    bool isLoading;
+    bool dataLoaded;
 
     DateTime? fromDate = DateTime.Today.AddMonths(-1);
     DateTime? toDate = DateTime.Today;
 
     List<Guid> selectedAccountGroupIds = new();
     List<Guid> selectedAccountIds = new();
-    bool onSeparatePage = false;
-    bool dataLoaded;
+    bool onSeparatePage;
 
     List<AccountGroupDto> groups = new();
-    List<AccountDto> accounts = new();       // filtered list    
-    List<AccountDto> allAccounts = new();       // filtered list    
+    List<AccountDto> accounts = new();
+    List<AccountDto> allAccounts = new();
+
+    List<LedgerReportDto> ledgerData = new();
+
+    ReportGrid<LedgerReportDto>? reportGrid;
+    Guid? lastSelectedVoucherId;
+    string? lastVoucherType;
+    Guid? lastVoucherId;
+
+    int? lastPageIndex;
 
     DotNetObjectReference<Ledger>? objRef;
+
 
     protected override async Task OnInitializedAsync()
     {
         Auth.OnChange += HandleAuthChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);            
+
+            if (!dataLoaded &&
+                Auth.IsInitialized &&
+                Auth.CurrentUser != null)
+            {
+                await LoadDataAsync();
+            }
+        }
     }
 
     void HandleAuthChanged()
@@ -130,10 +243,21 @@
             }
         });
     }
+
     public void Dispose()
     {
         Auth.OnChange -= HandleAuthChanged;
-        objRef?.Dispose();
+                objRef?.Dispose();
+    }
+
+    async Task LoadDataAsync()
+    {
+        dataLoaded = true;
+
+        groups = await AccountGroupApi.GetAccountGroupsAsync();
+        allAccounts = await AccountApi.GetAccountsAsync();
+        //accounts = allAccounts;
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnAccountGroupChanged(object value)
@@ -158,67 +282,277 @@
         await InvokeAsync(StateHasChanged);
     }
 
-
-    /* ---------------- Data ---------------- */
-
-    async Task LoadDataAsync()
+    async Task LoadLedgerGrid()
     {
-        dataLoaded = true;
+        if (isLoading) return;
 
-        groups = await AccountGroupApi.GetAccountGroupsAsync();
-        allAccounts = await AccountApi.GetAccountsAsync();
+        isLoading = true;
+        await InvokeAsync(StateHasChanged);
+
+        var request = new LedgerReportRequestDto
+        {
+            BranchId = Auth.CurrentUser?.BranchId ?? Guid.Empty,
+            FromDate = fromDate!.Value,
+            ToDate = toDate!.Value,
+            AccountGroupIds = selectedAccountGroupIds.Any() ? selectedAccountGroupIds : null,
+            AccountIds = selectedAccountIds.Any() ? selectedAccountIds : null,
+            OnSeparatePage = onSeparatePage
+        };
+
+        var data = await Api.GetLedgerGridAsync(request);
+        ledgerData = BuildAccountWiseLedger(data);
 
         await InvokeAsync(StateHasChanged);
-    }
 
-    async Task LoadReport()
-    {
-
-        if (isLoading)
-            return;
-
-        try
+        // 🔥 Restore previous page first
+        if (lastPageIndex != null && reportGrid != null)
         {
-            isLoading = true;
-            var branchId = Auth.CurrentUser?.BranchId ?? Guid.Empty;
-
-            var request = new LedgerReportDto
-            {
-                BranchId = branchId,
-                FromDate = fromDate!.Value.StartOfDay(),
-                ToDate = toDate!.Value.EndOfDay(),
-                AccountGroupIds = selectedAccountGroupIds.Any() ? selectedAccountGroupIds : null,
-                AccountIds = selectedAccountIds.Any() ? selectedAccountIds : null,
-                OnSeparatePage = onSeparatePage
-            };
-
-            var bytes = await Api.GetLedgerReportAsync(request);
-
-            await viewer!.LoadFromBytesAsync(bytes);
-        }
-        finally
-        {
-            isLoading = false;
-            await InvokeAsync(StateHasChanged);
+            await reportGrid.GoToPage(lastPageIndex.Value);
+            await Task.Delay(30);  // allow render
         }
 
 
-    }
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
+        if (ledgerData.Any())
         {
-            objRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("registerDialogShortcuts", objRef);
-
-
-            if (!dataLoaded &&
-                Auth.IsInitialized &&
-                Auth.CurrentUser != null)
+            LedgerReportDto? _recordToSelect = null;
+            if (lastSelectedVoucherId != null)
             {
-                await LoadDataAsync();
+                if (lastVoucherType != null && lastVoucherId != null)
+                {
+                    _recordToSelect = ledgerData.FirstOrDefault(x => x.VoucherType == lastVoucherType && x.VoucherId == lastVoucherId);
+                }
+            }
+            if (_recordToSelect == null)
+            {
+                _recordToSelect = ledgerData.FirstOrDefault(x =>
+                !x.IsAccountHeader &&
+                !x.IsOpeningRow &&
+                !x.IsAccountTotalRow);
+            }
+            if (_recordToSelect != null)
+            {
+                await SelectRowById(_recordToSelect.LedgerEntryId);
             }
         }
+
+
+        isLoading = false;
     }
 
+    async Task SelectRowById(Guid? id)
+    {
+        if (id == null || reportGrid == null)
+            return;
+
+        int index = ledgerData.FindIndex(x => x.LedgerEntryId == id);
+        if (index == -1)
+            return;
+
+        await reportGrid.SelectRowByIndex(index);
+    }
+
+    async Task LoadPdf()
+    {
+        var request = new LedgerReportRequestDto
+        {
+            BranchId = Auth.CurrentUser?.BranchId ?? Guid.Empty,
+            FromDate = fromDate!.Value,
+            ToDate = toDate!.Value,
+            AccountGroupIds = selectedAccountGroupIds.Any() ? selectedAccountGroupIds : null,
+            AccountIds = selectedAccountIds.Any() ? selectedAccountIds : null,
+            OnSeparatePage = onSeparatePage
+        };
+
+        var bytes = await Api.GetLedgerReportAsync(request);
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("openPdfInNewTab", base64);
+    }
+
+    string GetLedgerRowClass(LedgerReportDto row)
+    {
+        if (row.IsAccountHeader) return "ledger-account-header";
+        if (row.IsOpeningRow) return "ledger-opening-row";
+        if (row.IsAccountTotalRow) return "ledger-total-row";
+        return "";
+    }
+
+    async Task NavigateToVoucher(LedgerReportDto row)
+    {
+        if (row.IsOpeningRow || row.VoucherId == null)
+            return;
+
+        lastSelectedVoucherId = row.LedgerEntryId;
+        lastVoucherType = row.VoucherType;
+        lastVoucherId = row.VoucherId;
+
+        lastPageIndex = reportGrid?.CurrentPage;
+
+        bool? result = null;
+
+        switch (row.VoucherType)
+        {
+            case "Sale":
+                result = await DialogService.OpenAsync<SaleDialog>(
+                                    "Edit Sale",
+                                    new Dictionary<string, object> { { "SaleId", row.VoucherId } },
+                                    new DialogOptions
+                                    {
+                                        Width = "1400px",
+                                        CloseDialogOnEsc = true,
+                                        Draggable = true
+                                    });
+                if (result == true)
+                {
+                    await LoadLedgerGrid();
+                }
+                break;
+
+            case "Purchase":
+                result = await DialogService.OpenAsync<PurchaseDialog>(
+                               "Edit Purchase",
+                               new Dictionary<string, object> { { "PurchaseId", row.VoucherId } },
+                               new DialogOptions
+                               {
+                                   Width = "1400px",
+                                   CloseDialogOnEsc = true,
+                                   Draggable = true
+                               });
+                if (result == true)
+                {
+                    await LoadLedgerGrid();
+                }
+                break;
+
+            case "BankReceipt":
+                result = await DialogService.OpenAsync<BankReceiptVoucherDialog>(
+                                    "Edit Bank Receipt",
+                                    new Dictionary<string, object> { { "VoucherId", row.VoucherId } },
+                                    new DialogOptions
+                                    {
+                                        Width = "1100px",
+                                        CloseDialogOnEsc = true,
+                                        Draggable = true
+                                    });
+                if (result == true)
+                {
+                    await LoadLedgerGrid();
+                }
+                break;
+
+            case "BankPayment":
+                result = await DialogService.OpenAsync<BankPaymentVoucherDialog>(
+                                "Edit Bank Payment",
+                                new Dictionary<string, object> { { "VoucherId", row.VoucherId } },
+                                new DialogOptions
+                                {
+                                    Width = "1100px",
+                                    CloseDialogOnEsc = true,
+                                    Draggable = true
+                                });
+                if (result == true)
+                {
+                    await LoadLedgerGrid();
+                }
+                break;
+
+            case "CashReceipt":
+                result = await DialogService.OpenAsync<CashReceiptVoucherDialog>(
+                                "Edit Cash Receipt",
+                                new Dictionary<string, object> { { "VoucherId", row.VoucherId } },
+                                new DialogOptions
+                                {
+                                    Width = "1100px",
+                                    CloseDialogOnEsc = true,
+                                    Draggable = true
+                                });
+                if (result == true)
+                {
+                    await LoadLedgerGrid();
+                }
+                break;
+
+            case "CashPayment":
+                result = await DialogService.OpenAsync<CashPaymentVoucherDialog>(
+                                "Edit Cash Payment",
+                                new Dictionary<string, object> { { "VoucherId", row.VoucherId } },
+                                new DialogOptions
+                                {
+                                    Width = "1100px",
+                                    CloseDialogOnEsc = true,
+                                    Draggable = true
+                                });
+                if (result == true)
+                {
+                    await LoadLedgerGrid();
+                }
+                break;
+
+            case "Journal":
+                result = await DialogService.OpenAsync<JournalVoucherDialog>(
+                                "Edit Journal Voucher",
+                                new Dictionary<string, object> { { "VoucherId", row.VoucherId } },
+                                new DialogOptions
+                                {
+                                    Width = "1400px",
+                                    CloseDialogOnEsc = true,
+                                    Draggable = true
+                                });
+                if (result == true)
+                {
+                    await LoadLedgerGrid();
+                }
+                break;
+        }
+    }
+
+    List<LedgerReportDto> BuildAccountWiseLedger(List<LedgerReportDto> raw)
+    {
+        var result = new List<LedgerReportDto>();
+
+        var accounts = raw.Select(x => x.AccountName).Distinct();
+
+        foreach (var accountName in accounts)
+        {
+            result.Add(new LedgerReportDto
+            {
+                AccountName = accountName,
+                IsAccountHeader = true
+            });
+
+            var accountRows = raw.Where(x => x.AccountName == accountName).ToList();
+
+            var opening = accountRows.FirstOrDefault(x => x.IsOpeningRow);
+            if (opening != null)
+                result.Add(opening);
+
+            var transactions = accountRows.Where(x => !x.IsOpeningRow).ToList();
+
+            decimal totalDebit = 0;
+            decimal totalCredit = 0;
+            decimal closingBalance = 0;
+            bool closingIsDebit = false;
+
+            foreach (var row in transactions)
+            {
+                totalDebit += row.Debit;
+                totalCredit += row.Credit;
+                closingBalance = row.RunningBalance;
+                closingIsDebit = row.IsDebit;
+            }
+
+            result.AddRange(transactions);
+
+            result.Add(new LedgerReportDto
+            {
+                Particulars = "Total",
+                Debit = totalDebit,
+                Credit = totalCredit,
+                RunningBalance = closingBalance,
+                IsDebit = closingIsDebit,
+                IsAccountTotalRow = true
+            });
+        }
+
+        return result;
+    }
 }
